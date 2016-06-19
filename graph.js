@@ -33,13 +33,13 @@ var grh = grh || {
           if(Math.random() > 0.5){ //spawn on X-Border
             nd.pos.x = rnd.between(0, grh.dim.x);
             nd.pos.y = rnd.either(0, grh.dim.y); //Top or bottom border
-            nd.vec.x = rnd.between(0.1, max) * (nd.pos.y > 0 ? -1 : 1);
+            nd.vec.x = rnd.between(-max, max);
             nd.vec.y = nd.pos.y == 0 ? rnd.between(0, max) : rnd.between(-max, 0);
           }else{
             nd.pos.x = rnd.either(0, grh.dim.x); //Left or right border
             nd.pos.y = rnd.between(0, grh.dim.y);
             nd.vec.x = nd.pos.x == 0 ? rnd.between(0, max) : rnd.between(-max, 0);
-            nd.vec.y = rnd.between(0.1, max) * (nd.pos.x > 0 ? -1 : 1);
+            nd.vec.y = rnd.between(-max, max);
           }
         }
         grh.nds[i] = nd;
