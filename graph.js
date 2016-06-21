@@ -27,7 +27,7 @@ var grh = grh || {
   nodeSize: 2,
   lineWidth: 1.5,
   fps: 60,
-  density: 12000, //Smaller is denser
+  density: 9000, //Smaller is denser
   gravEnabled: false,
   gravFac: 2,
 
