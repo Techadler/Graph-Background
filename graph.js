@@ -30,7 +30,7 @@ var grh = grh || {
   tps: 30,
   density: 12000, //Smaller is denser
   gravEnabled: false,
-  gravFac: 0.0001,
+  gravFac: 2,
 
   addNode: function(t_initial){
     t_initial = t_initial || false;
@@ -297,12 +297,12 @@ grh.tick = grh.tick || {
           var f = grav(nd.size, nd2.size, d);
           //Betrag v: f/m * t
           var m = direction(nd, nd2);
-          var cor = (f/mass(nd.size) * (1000/grh.tps) ) / m.len; //Korrekturfaktor fÃ¼r m
+          var cor = (f/mass(nd.size) * (1/grh.tps) ) / m.len; //Korrekturfaktor für m
           //console.log("m.len: " + m.len + "  cor: " + cor + "    v:" + m.len * cor);
           nd.tvec.x += m.x * cor;
           nd.tvec.y += m.y * cor;
           m.x = m.x * -1; m.y = m.y * -1; //Switch direction for other node
-          cor = (f/mass(nd2.size) * 1000/grh.tps) / m.len;
+          cor = (f/mass(nd2.size) * 1/grh.tps) / m.len;
           nd2.tvec.x += m.x * cor;
           nd2.tvec.y += m.y * cor;
         }
