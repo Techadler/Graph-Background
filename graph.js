@@ -127,7 +127,7 @@ var grh = grh || {
       if(diff > 0){
         setTimeout(grh.render, diff);
       }else{
-        console.log("Frame rendering took " + Math.abs(diff) +"ms too long!");
+        console.log("Frame rendering took " + Math.round(Math.abs(diff)) +"ms too long!");
         grh.render();
       }
     }
