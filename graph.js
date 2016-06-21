@@ -62,12 +62,9 @@ var grh = grh || {
           }
         }
         grh.nds[i] = nd;
-        //console.log("Spawned Node: " + i);
-        //console.log(nd);
         return nd;
       }
     }
-    console.log("No free index, not spawning any nodes");
   },
   getContext: function(){
     if(grh.ctx === null || grh.ctx === undefined){
@@ -96,8 +93,7 @@ var grh = grh || {
     }
     grh.nds[t_id] = null;
   },
-  setEdge: function(t_id1, t_id2, t_bool)
-  {
+  setEdge: function(t_id1, t_id2, t_bool){
     grh.mtx[t_id1][t_id2] = t_bool;
     grh.mtx[t_id2][t_id1] = t_bool;
   },
@@ -119,11 +115,18 @@ var grh = grh || {
         grh.drawNode(nd);
       }
 
+      //Diagnostics
+      if(grh.diagnostics.writeTick !== undefined){
+        grh.diagnostics.writeTick();
+        grh.diagnostics.drawDiag();
+      }
+
+
       var diff = (1000 / grh.fps) - (new Date().getTime() - begin);
       if(diff > 0){
         setTimeout(grh.render, diff);
       }else{
-        console.log("Frame rendering took " + diff +"ms too long!");
+        console.log("Frame rendering took " + Math.abs(diff) +"ms too long!");
         grh.render();
       }
     }
@@ -168,6 +171,10 @@ var grh = grh || {
     grh.drawBackground();
     grh.dim.x = window.innerWidth;
     grh.dim.y = window.innerHeight;
+    if(grh.diagnostics !== undefined){
+      grh.diagnostics.diagX = grh.dim.x - 100;
+      grh.diagnostics.diagY = grh.dim.y - 40;
+    }
     if(grh.ctx !== null){
       grh.ctx.canvas.width = grh.dim.x;
       grh.ctx.canvas.height = grh.dim.y;
@@ -318,6 +325,55 @@ grh.tick = grh.tick || {
   }
 };
 
+grh.diagnostics = grh.diagnostics || {
+  fpsOT: Array(30), //stores the last X seconds of fps
+  fpsOT_idx: 0,
+  fpsOT_lastSecond: 0,
+  diagX: 20,
+  diagY: 20,
+  diagBackCol: "rgba(0,0,0, 0.5)",
+  writeTick: function(){
+    var curMS = function(){ return Date.now();};
+    var begOfSecond = function(){var date = new Date(); date.setMilliseconds(0); return date.getTime();}
+    var d = grh.diagnostics;
+
+    //Check if idx points to current second
+    if(d.fpsOT_lastSecond < curMS() - 1000){
+      ++d.fpsOT_idx;
+      if(d.fpsOT_idx == d.fpsOT.length) d.fpsOT_idx = 0;
+      d.fpsOT_lastSecond = begOfSecond();
+      d.fpsOT[d.fpsOT_idx] = 0;
+    }else{
+      d.fpsOT[d.fpsOT_idx]++;
+    }
+  },
+  drawDiag: function(){
+    if(grh.ctx !== undefined){
+      var d = grh.diagnostics;
+      grh.ctx.fillStyle = d.diagBackCol;
+      grh.ctx.fillRect(d.diagX, d.diagY, d.fpsOT.length * 2 + 35,  30);
+
+      var xRight = d.diagX + d.fpsOT.length * 2;
+      var yBot = d.diagY + 25;
+      for(var i = 0; i < d.fpsOT.length -1; i++){ //Dont render current frame stats
+        var idx = (d.fpsOT_idx -1 ) - i; //Dont render current bar
+        if(idx < 0) idx = (d.fpsOT.length) + idx;
+        var x = xRight -2 * i;
+        var fps = d.fpsOT[idx] /grh.fps;
+        //HSVtoRGB(0,1,1); Red //HSVtoRGB(120,1,1) //Green
+        grh.ctx.fillStyle = RedToGreenGrad(fps);
+        grh.ctx.fillRect(x-2, yBot, 2, -20 * ( d.fpsOT[idx] /grh.fps ));
+      }
+
+      grh.ctx.font = "9px Arial";
+      grh.ctx.fillStyle = "white";
+      var cfps = d.fpsOT[ d.fpsOT_idx == 0 ? d.fpsOT.length -1 : d.fpsOT_idx -1 ] || 0;
+      grh.ctx.fillText(grh.fps + " fps", xRight + 5, yBot -15); //Top fps
+      grh.ctx.fillStyle = RedToGreenGrad(cfps / grh.fps);
+      grh.ctx.fillText(cfps + " fps", xRight + 5, yBot); //Bot/cur fps
+    }
+  }
+};
 
 var rnd = {
   between: function(low, high){
@@ -332,6 +388,29 @@ var rnd = {
     return Math.random() > 0.5 ? x : y;
   }
 };
-
+var HSVtoRGB = function(t_H, t_S, t_V){ // t_H [0, 360], t_S, t_V [0,1]
+  var h = Math.round(t_H / 60);
+  var f = t_H / 60 - h;
+  var p = t_V * (1 - t_S);
+  var q = t_V * (1 - t_S * f);
+  var t = t_V * (1 - t_S * (1-f));
+  var rgb = {};
+  switch (h) {
+    case 1: rgb = {r: q, g: t_V, b: p}; break;
+    case 2: rgb = {r: p, g: t_V, b: t}; break;
+    case 3: rgb = {r: p, g: q, b: t_V}; break;
+    case 4: rgb = {r: t, g: p, b: t_V}; break;
+    case 5: rgb = {r: t_V, g: p, b: q}; break;
+    default:rgb = {r: t_V, g: t, b: p}; break;
+  }
+  rgb.r = Math.round(rgb.r * 255);
+  rgb.g = Math.round(rgb.g * 255);
+  rgb.b = Math.round(rgb.b * 255);
+  return rgb;
+};
+var RedToGreenGrad = function(t_fac){
+  var rgb = HSVtoRGB(120 * t_fac, 1, 1);
+  return "rgb("+rgb.r+","+rgb.g+","+rgb.b+")";
+}
 window.addEventListener('load', grh.init);
 window.addEventListener('resize', grh.resize);
