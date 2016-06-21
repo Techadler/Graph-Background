@@ -20,13 +20,13 @@ var grh = grh || {
   nodeCount: 120,
   maxEdges:100,
   maxEdgLen: 150,
-  maxSpeed: 1,
+  maxSpeed: 20,
   colEdge: "#e4e4e4",
   colNode: "#ffffff",
   colBack: "#0d6aa4",//#1286d0
   nodeSize: 2,
   lineWidth: 1.5,
-  tps: 20,
+  tps: 30,
   gravEnabled: false,
   gravFac: 0.0001,
   fps: 30,
@@ -319,8 +319,8 @@ grh.tick = grh.tick || {
   moveNodes: function(){
     for(var i = 0; i < grh.nodeCount; i++){
       var nd = grh.nds[i];
-      nd.pos.x += nd.vec.x;
-      nd.pos.y += nd.vec.y;
+      nd.pos.x += nd.vec.x * (1 / grh.tps);
+      nd.pos.y += nd.vec.y * (1 / grh.tps);
     }
   }
 };
