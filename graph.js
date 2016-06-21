@@ -26,10 +26,11 @@ var grh = grh || {
   colBack: "#0d6aa4",//#1286d0
   nodeSize: 2,
   lineWidth: 1.5,
+  fps: 30,
   tps: 30,
+  density: 12000, //Smaller is denser
   gravEnabled: false,
   gravFac: 0.0001,
-  fps: 30,
 
   addNode: function(t_initial){
     t_initial = t_initial || false;
@@ -183,7 +184,7 @@ var grh = grh || {
   init: function(){
     grh.resize();
 
-    grh.nodeCount = Math.floor(grh.dim.x * grh.dim.y / 12000);
+    grh.nodeCount = Math.floor(grh.dim.x * grh.dim.y / grh.density);
     //Init Matrix
     grh.mtx = [];
     for(var i = 0; i < grh.nodeCount; ++i){
