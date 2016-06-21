@@ -1,5 +1,4 @@
-/*
-The MIT License (MIT)
+/*The MIT License (MIT)
 
 Copyright (c) 2016 Carsten Rattay
 
@@ -19,12 +18,17 @@ var grh = grh || {
   mtx: [],
   dim: { x:1900, y:500 },
   nodeCount: 120,
-  maxEdges:3,
-  maxEdgLen: 125,
+  maxEdges:100,
+  maxEdgLen: 150,
+  maxSpeed: 1,
   colEdge: "#e4e4e4",
   colNode: "#ffffff",
   colBack: "#0d6aa4",//#1286d0
+  nodeSize: 2,
+  lineWidth: 1.5,
   tps: 20,
+  gravEnabled: false,
+  gravFac: 0.0001,
   fps: 30,
 
   addNode: function(t_initial){
@@ -33,11 +37,11 @@ var grh = grh || {
       if(grh.nds[i] === undefined || grh.nds[i] === null){
         var nd = {
           id: i,
-          size: (Math.floor(Math.random() * 3 + 2)), //Size between 1 and 5
+          size: (Math.floor(Math.random() * grh.nodeSize + 2)), //Size between 1 and 5
           pos: {},
           vec: {}
         };
-        var max = 0.5;//max-speed
+        var max = grh.maxSpeed;//max-speed
         if(t_initial){
           nd.pos.x = rnd.between(0, grh.dim.x);
           nd.pos.y = rnd.between(0, grh.dim.y);
@@ -133,7 +137,10 @@ var grh = grh || {
   },
   drawEdge: function(t_nd1, t_nd2){
     if(grh.ctx !== null){
-      grh.ctx.lineWidth = 1;
+      var d = grh.dist(t_nd1, t_nd2);
+      var fac = (1 - (d * d) / Math.pow(grh.maxEdgLen, 2));
+      if(fac >= 1 || fac < 0){ fac = 0.00001; } //prevent underflow, so lineWidth does not fallback to default
+      grh.ctx.lineWidth = grh.lineWidth * fac;
       grh.ctx.shadowBlur = 0;
       grh.ctx.beginPath();
       grh.ctx.moveTo(t_nd1.pos.x, t_nd1.pos.y);
@@ -151,6 +158,11 @@ var grh = grh || {
       grh.ctx.stroke();
       grh.ctx.fill();
     }
+  },
+  dist: function(t_nd1, t_nd2){
+    var x = t_nd1.pos.x - t_nd2.pos.x;
+    var y = t_nd1.pos.y - t_nd2.pos.y;
+    return Math.sqrt(x*x + y*y);
   },
   resize: function(){
     grh.drawBackground();
@@ -198,7 +210,8 @@ grh.tick = grh.tick || {
       grh.tick.checkHitbox();
       grh.tick.checkEdges();
     }
-
+    if(grh.gravEnabled)
+      grh.tick.applyGravity();
     grh.tick.moveNodes();
 
     var diff = (1000 / grh.tps) - (new Date().getTime() - begin);
@@ -230,10 +243,10 @@ grh.tick = grh.tick || {
       return Math.sqrt(x*x + y*y);
     }
     var edglen = grh.maxEdgLen;
-    for(var i = 0; i < grh.nodeCount -1; ++i){ //Letzte muss nicht geprüft werden
+    for(var i = 0; i < grh.nodeCount -1; ++i){ //Letzte muss nicht geprÃƒÂ¼ft werden
       var nb = grh.getNeighbours(i);
       for(var j = 0; j < nb.length; ++j){
-        if(dist(grh.nds[i], nb[j]) > edglen * 1.5) //Make the edges pop at greater distances
+        if(dist(grh.nds[i], nb[j]) > edglen) //Make the edges pop at greater distances
           grh.setEdge(i, nb[j].id, false);
       }
     }
@@ -248,6 +261,52 @@ grh.tick = grh.tick || {
           }
         }
       }
+    }
+  },
+  applyGravity: function(){
+    var mass = function(t_r){
+      return 1.33 * Math.PI * Math.pow(t_r, 3);
+    };
+    var direction = function(t_nd1, t_nd2){
+      var m = {};
+      m.x = t_nd2.pos.x - t_nd1.pos.x;
+      m.y = t_nd2.pos.y - t_nd1.pos.y;
+      m.len = Math.sqrt(m.x * m.x + m.y * m.y);
+      return m;
+    };
+    var grav = function(t_s1, t_s2, dist){
+      var f = mass(t_s1) * mass(t_s2)  / Math.pow(dist, 2);
+      return f * grh.gravFac;
+    };
+    for(var i = 0; i < grh.nodeCount -1; ++i){
+      var nd = grh.nds[i];
+      nd.tvec = nd.tvec || { 'x': 0, 'y': 0};
+      for(var j = i+1; j < grh.nodeCount; ++j){
+        var nd2 = grh.nds[j];
+        nd2.tvec = nd2.tvec || { 'x': 0, 'y': 0};
+        var d = grh.dist(nd, nd2);
+        if(d < grh.maxEdgLen){
+          var f = grav(nd.size, nd2.size, d);
+          //Betrag v: f/m * t
+          var m = direction(nd, nd2);
+          var cor = (f/mass(nd.size) * (1000/grh.tps) ) / m.len; //Korrekturfaktor fÃ¼r m
+          //console.log("m.len: " + m.len + "  cor: " + cor + "    v:" + m.len * cor);
+          nd.tvec.x += m.x * cor;
+          nd.tvec.y += m.y * cor;
+          m.x = m.x * -1; m.y = m.y * -1; //Switch direction for other node
+          cor = (f/mass(nd2.size) * 1000/grh.tps) / m.len;
+          nd2.tvec.x += m.x * cor;
+          nd2.tvec.y += m.y * cor;
+        }
+      }
+    }
+    //Apply Vectors
+    for(var i = 0; i < grh.nodeCount; ++i){
+      var nd = grh.nds[i];
+      //console.log(nd.tvec);
+      nd.vec.x += nd.tvec.x;
+      nd.vec.y += nd.tvec.y;
+      nd.tvec = null;
     }
   },
   moveNodes: function(){
