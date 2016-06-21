@@ -208,12 +208,25 @@ var grh = grh || {
     grh.started = false;
     console.log("Stopped Runner")
   },
+  togglePause: function(){
+    if(grh.started){
+      grh.stop();
+    }else{
+      grh.start();
+    }
+  },
   runner: function(){
     grh.lastRun = grh.lastRun || Date.now();
     var ts = Date.now();
     var step = 1000/grh.fps;
     if(grh.lastRun < ts - step){
       var delta = ts - grh.lastRun;
+      if(delta >= step * 20) {
+        grh.panic(delta);
+        grh.lastRun = ts;
+        grh.runner();
+        return;
+      }
       for(;delta >= step; delta -= step){
         grh.tick.tick();
       }
@@ -221,6 +234,10 @@ var grh = grh || {
       grh.lastRun = ts;
     }
     grh.runnerID = requestAnimationFrame(grh.runner);
+  },
+  panic: function(t_delta){
+    console.log("Runner paniced, couldn't keep up! Delta was: " + t_delta + "ms.");
+    console.log("Skipped " + Math.floor(t_delta / (1000/grh.fps))+ " update cycles." );
   }
 }
 
