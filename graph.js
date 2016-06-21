@@ -12,6 +12,7 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+
 var grh = grh || {
   ctx: null,
   nds: [],
@@ -241,6 +242,88 @@ var grh = grh || {
   }
 }
 
+grh.ui = grh.ui || (function(){
+  var mouseDown = false;
+  var focusedNode = null;
+
+  var findNode = function(t_x, t_y){
+    for(var i = 0; i < grh.nds.length; ++i){
+      var nd = grh.nds[i];
+      var x = 2; //Make Clicking easier
+      if(nd.pos.x + (nd.size + x) > t_x && nd.pos.x - (nd.size +x) < t_x){
+        if(nd.pos.y + (nd.size + x) > t_y && nd.pos.y - (nd.size + x) < t_y)
+          return nd;
+      }
+    }
+    return null;
+  }
+
+  var onMouseDown = function(event){
+    //console.log(event);
+    mouseDown = true;
+    //event.clientX; event.clientY;
+    var nd = findNode(event.clientX, event.clientY);
+    if(nd !== null){
+      nd.vecBak = nd.vec;
+      nd.vec = {x: 0, y:0};
+      focusedNode = nd;
+
+      lastX = event.clientX;
+      lastY = event.clientY;
+    }
+  }
+  var onMouseUp = function(event){
+    //console.log(event);
+    mouseDown = false;
+    lastX = null;
+    lastY = null;
+    if(focusedNode !== null){ //Restore vector
+      focusedNode.vec = focusedNode.vecBak;
+      focusedNode.vecBak = undefined;
+    }
+    focusedNode = null;
+  }
+  var lastX = null;
+  var lastY = null;
+  var onMouseMove = function(event){
+    if(mouseDown && focusedNode !== null){
+      if(lastX !== null && lastY !== null){
+        var dx = event.clientX - lastX;
+        var dy = event.clientY - lastY;
+        var nx = focusedNode.pos.x + dx;
+        var ny = focusedNode.pos.y + dy;
+        //Move Neighbours
+        var nbs = grh.getNeighbours(focusedNode.id);
+        for(var i = 0; i < nbs.length; ++i){
+          var edgLen = grh.dist(focusedNode, nbs[i]);
+          var newLen = grh.dist({pos : {x:nx, y:ny}}, nbs[i]);
+          if(edgLen < newLen){
+            var dLen = newLen - edgLen;
+            var mx = nx - nbs[i].pos.x;
+            var my = ny - nbs[i].pos.y;
+            var cor = dLen / Math.sqrt(mx*mx + my*my);
+            nbs[i].pos.x += mx * cor;
+            nbs[i].pos.y += my * cor;
+          }
+        }
+
+        focusedNode.pos.x = nx;
+        focusedNode.pos.y = ny;
+      }
+      lastX = event.clientX;
+      lastY = event.clientY;
+    }
+  }
+  return {
+    attachTo: function(el){
+      el.addEventListener('mousedown', onMouseDown);
+      el.addEventListener('mousemove', onMouseMove);
+      el.addEventListener('mouseup', onMouseUp);
+      window.addEventListener('mouseup', onMouseUp);
+    }
+  }
+})();
+
 grh.tick = grh.tick || {
   tick: function(){
     grh.tick.checkHitbox();
@@ -434,3 +517,7 @@ var RedToGreenGrad = function(t_fac){
 }
 window.addEventListener('load', grh.init);
 window.addEventListener('resize', grh.resize);
+
+window.addEventListener('load', function(){
+  grh.ui.attachTo(document.getElementById('canvas'));
+})
