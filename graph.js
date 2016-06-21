@@ -26,8 +26,7 @@ var grh = grh || {
   colBack: "#0d6aa4",//#1286d0
   nodeSize: 2,
   lineWidth: 1.5,
-  fps: 30,
-  tps: 30,
+  fps: 60,
   density: 12000, //Smaller is denser
   gravEnabled: false,
   gravFac: 2,
@@ -100,7 +99,6 @@ var grh = grh || {
   },
   render: function(){
     if(grh.ctx !== null){
-      var begin = new Date().getTime();
       grh.drawBackground();
 
       for(var i = 0; i < grh.nodeCount; ++i){
@@ -120,15 +118,6 @@ var grh = grh || {
       if(grh.diagnostics.writeTick !== undefined){
         grh.diagnostics.writeTick();
         grh.diagnostics.drawDiag();
-      }
-
-
-      var diff = (1000 / grh.fps) - (new Date().getTime() - begin);
-      if(diff > 0){
-        setTimeout(grh.render, diff);
-      }else{
-        console.log("Frame rendering took " + Math.round(Math.abs(diff)) +"ms too long!");
-        grh.render();
       }
     }
   },
@@ -202,33 +191,46 @@ var grh = grh || {
 
     grh.getContext();
 
-    grh.render();
-    grh.tick.start();
+    grh.start();
+  },
+  start: function(){
+    if(!grh.started){
+      grh.started = true;
+      grh.runnerID = requestAnimationFrame(grh.runner);
+      console.log("Started Runner with ID:" + grh.runnerID);
+    }
+  },
+  stop: function(){
+    console.log("Trying to stop runner with ID: " + grh.runnerID);
+    if(grh.runnerID !== undefined || grh.runnerID !== null)
+      cancelAnimationFrame(grh.runnerID);
+    grh.runnerID = null;
+    grh.started = false;
+    console.log("Stopped Runner")
+  },
+  runner: function(){
+    grh.lastRun = grh.lastRun || Date.now();
+    var ts = Date.now();
+    var step = 1000/grh.fps;
+    if(grh.lastRun < ts - step){
+      var delta = ts - grh.lastRun;
+      for(;delta >= step; delta -= step){
+        grh.tick.tick();
+      }
+      grh.render();
+      grh.lastRun = ts;
+    }
+    grh.runnerID = requestAnimationFrame(grh.runner);
   }
 }
 
 grh.tick = grh.tick || {
-  start: function(){
-    grh.tick.tick();
-  },
   tick: function(){
-    var begin = new Date().getTime();
-
-    if(rnd.between(0, 1) > 0.66){
-      grh.tick.checkHitbox();
-      grh.tick.checkEdges();
-    }
+    grh.tick.checkHitbox();
+    grh.tick.checkEdges();
     if(grh.gravEnabled)
       grh.tick.applyGravity();
     grh.tick.moveNodes();
-
-    var diff = (1000 / grh.tps) - (new Date().getTime() - begin);
-    if(diff > 0){
-      setTimeout(grh.tick.tick, diff);
-    }else{
-      console.log("Tick took " + Math.abs(diff)+"ms too long!");
-      grh.tick.tick();
-    }
   },
   checkHitbox: function(){
     var rem = 0;
@@ -297,12 +299,12 @@ grh.tick = grh.tick || {
           var f = grav(nd.size, nd2.size, d);
           //Betrag v: f/m * t
           var m = direction(nd, nd2);
-          var cor = (f/mass(nd.size) * (1/grh.tps) ) / m.len; //Korrekturfaktor für m
+          var cor = (f/mass(nd.size) * (1/grh.fps) ) / m.len; //Korrekturfaktor für m
           //console.log("m.len: " + m.len + "  cor: " + cor + "    v:" + m.len * cor);
           nd.tvec.x += m.x * cor;
           nd.tvec.y += m.y * cor;
           m.x = m.x * -1; m.y = m.y * -1; //Switch direction for other node
-          cor = (f/mass(nd2.size) * 1/grh.tps) / m.len;
+          cor = (f/mass(nd2.size) * 1/grh.fps) / m.len;
           nd2.tvec.x += m.x * cor;
           nd2.tvec.y += m.y * cor;
         }
@@ -320,8 +322,8 @@ grh.tick = grh.tick || {
   moveNodes: function(){
     for(var i = 0; i < grh.nodeCount; i++){
       var nd = grh.nds[i];
-      nd.pos.x += nd.vec.x * (1 / grh.tps);
-      nd.pos.y += nd.vec.y * (1 / grh.tps);
+      nd.pos.x += nd.vec.x * (1 / grh.fps);
+      nd.pos.y += nd.vec.y * (1 / grh.fps);
     }
   }
 };
