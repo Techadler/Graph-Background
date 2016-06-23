@@ -1,4 +1,4 @@
-/*The MIT License (MIT)
+/* The MIT License (MIT)
 
 Copyright (c) 2016 Carsten Rattay
 
@@ -12,512 +12,566 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
+var atc = atc || {};
 
-var grh = grh || {
-  ctx: null,
-  nds: [],
-  mtx: [],
-  dim: { x:1900, y:500 },
-  nodeCount: 120,
-  maxEdges:100,
-  maxEdgLen: 150,
-  maxSpeed: 20,
-  colEdge: "#e4e4e4",
-  colNode: "#ffffff",
-  colBack: "#0d6aa4",//#1286d0
-  nodeSize: 2,
-  lineWidth: 1.5,
-  fps: 60,
-  density: 9000, //Smaller is denser
-  gravEnabled: false,
-  gravFac: 2,
+atc.base = atc.base || (function () {
+  // Privates
+  var instances = {};
 
-  addNode: function(t_initial){
-    t_initial = t_initial || false;
-    for(var i = 0; i < grh.nodeCount; ++i){
-      if(grh.nds[i] === undefined || grh.nds[i] === null){
-        var nd = {
-          id: i,
-          size: (Math.floor(Math.random() * grh.nodeSize + 2)), //Size between 1 and 5
-          pos: {},
-          vec: {}
-        };
-        var max = grh.maxSpeed;//max-speed
-        if(t_initial){
-          nd.pos.x = rnd.between(0, grh.dim.x);
-          nd.pos.y = rnd.between(0, grh.dim.y);
-          nd.vec.x = rnd.between(-max, max);
-          nd.vec.y = rnd.between(-max, max);
-        }else{
-          //Spawn it at the edge of our container with an inwards direction
-          if(Math.random() > 0.5){ //spawn on X-Border
-            nd.pos.x = rnd.between(0, grh.dim.x);
-            nd.pos.y = rnd.either(0, grh.dim.y); //Top or bottom border
-            nd.vec.x = rnd.between(-max, max);
-            nd.vec.y = nd.pos.y == 0 ? rnd.between(0, max) : rnd.between(-max, 0);
-          }else{
-            nd.pos.x = rnd.either(0, grh.dim.x); //Left or right border
-            nd.pos.y = rnd.between(0, grh.dim.y);
-            nd.vec.x = nd.pos.x == 0 ? rnd.between(0, max) : rnd.between(-max, 0);
-            nd.vec.y = rnd.between(-max, max);
-          }
+  function generateID () {
+    var id;
+    do {
+      id = String.fromCharCode(Math.floor((Math.random() * 25) + 65));
+      do {
+        var asci = Math.floor((Math.random() * 42) + 48);
+        if (asci < 58 || asci > 64) {
+          id += String.fromCharCode(asci);
         }
-        grh.nds[i] = nd;
-        return nd;
-      }
-    }
-  },
-  getContext: function(){
-    if(grh.ctx === null || grh.ctx === undefined){
-      var el = document.getElementById('canvas');
-      el.setAttribute("width", grh.dim.x);
-      el.setAttribute("height", grh.dim.y);
-      grh.ctx = el.getContext('2d');
-    }
-  },
-  getNeighbours: function(t_id){
-    var n = []; var x = 0;
-    for(var i = 0; i < grh.nodeCount; ++i){
-      if(grh.mtx[t_id][i] === true)
-      {
-        n[x] = grh.nds[i];
-        ++x;
-      }
-    }
-    return n;
-  },
-  removeNode: function(t_id){
-    //console.log("Removing node: " +t_id);
-    var nb = grh.getNeighbours(t_id);
-    for(var i = 0; i < nb.length; ++i){
-      grh.setEdge(t_id, nb[i].id, false);
-    }
-    grh.nds[t_id] = null;
-  },
-  setEdge: function(t_id1, t_id2, t_bool){
-    grh.mtx[t_id1][t_id2] = t_bool;
-    grh.mtx[t_id2][t_id1] = t_bool;
-  },
-  render: function(){
-    if(grh.ctx !== null){
-      grh.drawBackground();
+      } while (id.length !== 16);
+    } while (Object.keys(instances).indexOf(id) > -1);
+    return id;
+  }
 
-      for(var i = 0; i < grh.nodeCount; ++i){
-        var nd = grh.nds[i];
-        if(i < grh.nodeCount -1){ //draw Edges
-          var nb = grh.getNeighbours(i);
-          for(var j = 0; j < nb.length; ++j){
-            if(nb[j].id > i){
-              grh.drawEdge(nd, nb[j]);
+  function parseConfig (t_conf) {
+    var defConf = atc.base.getDefaultConfig();
+    if (t_conf !== undefined) {
+      var allKeys = Object.keys(defConf);
+      var keys = Object.keys(t_conf);
+      for (let idx in keys) { // Check config to only contain known setting options
+        if (allKeys.indexOf(keys[idx]) === -1) {
+          console.log('Unknown config option: ' + keys[idx]);
+          delete t_conf[keys[idx]];
+        }
+      }
+      for (let idx in allKeys) {
+        var key = allKeys[idx];
+        if (t_conf[key] === undefined) {
+          t_conf[key] = defConf[key];
+        }
+      }
+    } else {
+      t_conf = defConf;
+    }
+    return t_conf;
+  }
+
+  // Public
+  return {
+    createInstance: function (t_el, t_conf) {
+      if (t_el === undefined || t_el.nodeName !== 'CANVAS') {
+        console.log('Passed element is not a canvas!'); return;
+      }
+      t_conf = parseConfig(t_conf);
+      var id = generateID();
+      instances[id] = new atc.Instance(t_el, t_conf, id);
+      return id;
+    },
+    getInstanceIDs: function () {
+      return Object.keys(instances);
+    },
+    startInstance: function (t_id) {
+      instances[t_id].start();
+    },
+    stopInstance: function (t_id) {
+      instances[t_id].stop();
+    },
+    getInstanceState: function (t_id) {
+      return instances[t_id].getState();
+    },
+    destroyInstance: function (t_id) {
+      atc.base.stopInstance(t_id);
+      instances[t_id].destroy();
+      delete instances[t_id];
+    },
+    getDefaultConfig: function () {
+      return {
+        edgeColor: '#e4e4e4',
+        nodeColor: '#ffffff',
+        backColor: '#0d6aa4', // #1286d0
+        nodeMinSize: 2,
+        nodeMaxSize: 5,
+        edgeWidth: 1.5,
+        density: 9000, // Smaller is denser
+
+        gravity: false,
+        gravityStrength: 2,
+
+        height: 0,
+        maxHeight: 0,
+        width: 0,
+        maxWidth: 0,
+
+        uiEnabled: false,
+        diagnosticsEnabled: true,
+
+        maxEdges: 100,
+        maxEdgeLength: 150,
+        maxFPS: 60,
+        maxNodes: 120,
+        maxSpeed: 20
+      };
+    }
+  };
+})();
+
+function Node (t_id, t_minSize, t_maxSize, t_pos, t_vec) {
+  this.id = t_id;
+  t_minSize = t_minSize || 2;
+  t_maxSize = t_maxSize || 5;
+  this.size = Math.random() * Math.abs(t_maxSize - t_minSize) + Math.abs(t_minSize);
+  this.pos = t_pos || {x: 0, y: 0};
+  this.vec = t_vec || {x: 0, y: 0};
+}
+Node.prototype.distanceTo = function (t_nd) {
+  var x = t_nd.pos.x - this.pos.x;
+  var y = t_nd.pos.y - this.pos.y;
+  return Math.sqrt(x * x + y * y);
+};
+
+atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
+  if (!(this instanceof atc.Instance)) return new atc.Instance(t_el, t_conf, t_id);
+
+  var conf = t_conf;
+  var id = t_id;
+  var canvas = t_el;
+  var dimension = { x: undefined, y: undefined };
+  var loopID = null;
+  var lastRun = null;
+  var nodes = [];
+  var mtx = [];
+  var maxNodes = 0;
+  setMaxNodes(conf.maxNodes);
+
+  function populate () {
+    for (let i = 0; i < maxNodes; ++i) {
+      var n = new Node(i, conf.nodeMinSize, conf.nodeMaxSize, getRndPos(), getRndVec());
+      nodes[i] = n;
+    }
+  }
+  function getRndPos () {
+    var pos = {};
+    pos.x = Math.random() * dimension.x;
+    pos.y = Math.random() * dimension.y;
+    return pos;
+  }
+  function getRndBorderPos () {
+    var pos = {};
+    if (Math.random() < 0.5) { // Take X Border
+      pos.x = Math.random() < 0.5 ? 0 : dimension.x;
+      pos.y = Math.random() * dimension.y;
+    } else {
+      pos.x = Math.random() * dimension.x;
+      pos.y = Math.random() < 0.5 ? 0 : dimension.y;
+    }
+    return pos;
+  }
+  function getRndVec () {
+    var vec = {};
+    vec.x = Math.random() * 2 * conf.maxSpeed - conf.maxSpeed;
+    vec.y = Math.random() * 2 * conf.maxSpeed - conf.maxSpeed;
+    return vec;
+  }
+  function setMaxNodes (t_size) {
+    if (t_size < maxNodes) { // need to delete
+      nodes = nodes.splice(t_size - 1, maxNodes - t_size);
+    } else { // Append null values up to t_size
+      var l = nodes.length;
+      nodes.length = t_size;
+      nodes.fill(null, l);
+    }
+    var edgMtx = Array(t_size);
+    for (let i = 0; i < t_size; ++i) { // Initialize rows and copy values if possible
+      edgMtx[i] = Array(t_size);
+      if (i < mtx.length) { // Copy the rows if possible
+        var j;
+        for (j = 0; j < mtx.length && j < t_size; ++j) {
+          edgMtx[i][j] = mtx[i][j];
+        }
+        edgMtx[i].fill(false, j, t_size);
+      } else {
+        edgMtx[i].fill(false);
+      }
+    }
+    maxNodes = t_size;
+    mtx = edgMtx;
+  }
+  function mainLoop () {
+    if (lastRun === null || lastRun < Date.now() - 1000 / conf.maxFPS) {
+      var ts = Date.now();
+      var step = 1000 / conf.maxFPS;
+      var delta = lastRun !== null ? ts - lastRun : 0;
+      do {
+        physics.tick();
+      } while ((delta -= step) > step);
+      render.doRenderCycle();
+      lastRun = ts;
+    }
+    loopID = window.requestAnimationFrame(mainLoop);
+  }
+
+  function setDimension (t_el) {
+    // width: 0 -> grow
+      // maxWidth: -> growLimit
+    var p = t_el.parentNode;
+    if (conf.width === 0) {
+      if (conf.maxWidth > 0) {
+        dimension.x = p.clientWidth > conf.maxWidth ? conf.maxWidth : p.clientWidth;
+      } else {
+        dimension.x = p.clientWidth;
+      }
+    } else {
+      dimension.x = conf.width;
+    }
+    if (conf.height === 0) {
+      if (conf.maxHeight > 0) {
+        dimension.y = p.clientHeight > conf.maxHeight ? conf.maxHeight : p.clientHeight;
+      } else {
+        dimension.y = p.clientHeight;
+      }
+    } else {
+      dimension.y = conf.height;
+    }
+    t_el.setAttribute('width', dimension.x);
+    t_el.setAttribute('height', dimension.y);
+  }
+
+  this.addNode = function () { // AddSingle Node to free index
+    for (let i = 0; i < nodes.length; ++i) {
+      if (nodes[i] === null) {
+        var pos = getRndBorderPos();
+        var vec = getRndVec();
+        if (pos.x === 0 || pos.x === dimension.x) {
+          vec.x = pos.x === 0 ? Math.abs(vec.x) : -Math.abs(vec.x);
+        } else {
+          vec.y = pos.y === 0 ? Math.abs(vec.y) : -Math.abs(vec.y);
+        }
+        nodes[i] = new Node(i, conf.nodeMinSize, conf.nodeMaxSize, pos, vec);
+        break;
+      }
+    }
+  };
+  this.destroy = function () {
+    this.stop();
+    window.removeEventListener('resize', this.onResize);
+    ui.unbind();
+    render = null;
+    physics = null;
+    ui = null;
+    canvas.setAttribute('width', 0);
+    canvas.setAttribute('height', 0);
+  };
+  this.getBackColor = function () {
+    return conf.backColor;
+  };
+  this.getDiagnosticsEnabled = function () {
+    return conf.diagnosticsEnabled;
+  },
+  this.getDimensions = function () {
+    return dimension;
+  };
+  this.getEdgeColor = function () {
+    return conf.edgeColor;
+  };
+  this.getEdgeWidth = function () {
+    return conf.edgeWidth;
+  };
+  this.getMaxEdgeLength = function () {
+    return conf.maxEdgeLength;
+  };
+  this.getMaxFPS = function () {
+    return conf.maxFPS;
+  };
+  this.getNeighbours = function (t_id) {
+    var arr = [];
+    for (let i = 0; i < maxNodes; ++i) {
+      if (mtx[t_id][i]) {
+        arr.push(nodes[i]);
+      }
+    }
+    return arr;
+  };
+  this.getNodes = function () {
+    return nodes;
+  };
+  this.getNodeColor = function () {
+    return conf.nodeColor;
+  };
+  this.getState = function () {
+    return {
+      id: id,
+      running: loopID !== null
+    };
+  };
+  this.onResize = function (event) {
+    setDimension(canvas);
+  };
+  this.removeNode = function (t_id) {
+    for (let i = 0; i < maxNodes; ++i) {
+      if (mtx[t_id][i]) {
+        this.setEdge(t_id, i, false);
+      }
+    }
+    nodes[t_id] = null;
+  };
+  this.setEdge = function (t_id1, t_id2, t_bool) {
+    mtx[t_id1][t_id2] = t_bool;
+    mtx[t_id2][t_id1] = t_bool;
+  };
+  this.start = function () {
+    loopID = window.requestAnimationFrame(mainLoop);
+  };
+  this.stop = function () {
+    if (loopID !== null) {
+      window.cancelAnimationFrame(loopID);
+    }
+    loopID = null;
+  };
+
+  // Run initialization Code
+  setDimension(t_el);
+  populate();
+  var render = new atc.Render(t_el, this); // We are calling this here, so we need to make sure that this has all properties by now
+  var physics = new atc.Physics(this);
+  var ui = new atc.UserInterface(t_el, this);
+  if (conf.uiEnabled) {
+    ui.bind(t_el);
+  }
+  window.addEventListener('resize', this.onResize);
+};
+
+atc.Render = atc.Render || function (t_el, t_instance) {
+  var ctx = t_el.getContext('2d');
+  var instance = t_instance;
+
+  function drawBackground () {
+    var d = instance.getDimensions();
+    ctx.clearRect(0, 0, d.x, d.y);
+    ctx.fillStyle = instance.getBackColor();
+    ctx.fillRect(0, 0, d.x, d.y);
+  }
+
+  function drawEdge (t_nd1, t_nd2) {
+    var d = t_nd1.distanceTo(t_nd2);
+    var fac = (1 - (d * d) / Math.pow(instance.getMaxEdgeLength(), 2));
+    if (fac > 1 || fac < 0) fac = 0;
+    ctx.lineWidth = instance.getEdgeWidth() * fac;
+    ctx.beginPath();
+    ctx.moveTo(t_nd1.pos.x, t_nd1.pos.y);
+    ctx.lineTo(t_nd2.pos.x, t_nd2.pos.y);
+    ctx.strokeStyle = instance.getEdgeColor();
+    ctx.stroke();
+  }
+
+  function drawNode (t_nd) {
+    ctx.fillStyle = instance.getNodeColor();
+    ctx.beginPath();
+    ctx.arc(t_nd.pos.x, t_nd.pos.y, t_nd.size, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = instance.getEdgeColor();
+    ctx.stroke();
+  }
+
+  var diagnostics = !instance.getDiagnosticsEnabled() ? null : new atc.Diagnostics(instance);
+
+  return {
+    doRenderCycle: function () {
+      drawBackground();
+      var nds = instance.getNodes();
+      for (let i = 0; i < nds.length; ++i) {
+        var nd = nds[i];
+        if (i < nds.length - 1) { // No need to calc edges for last node
+          var nbs = instance.getNeighbours(nd.id);
+          for (let j = 0; j < nbs.length; ++j) {
+            if (nbs[j].id > nd.id) { // Only draw Edges to nodes we have not walked yet
+              drawEdge(nd, nbs[j]);
             }
           }
         }
-        grh.drawNode(nd);
       }
+      for (let i = 0; i < nds.length; ++i) {
+        drawNode(nds[i]);
+      }
+      if (diagnostics !== null) {
+        diagnostics.writeFrame();
+        diagnostics.drawDiagWindow(ctx, 10, 10);
+      }
+    }
+  };
+};
 
-      //Diagnostics
-      if(grh.diagnostics.writeTick !== undefined){
-        grh.diagnostics.writeTick();
-        grh.diagnostics.drawDiag();
-      }
-    }
-  },
-  drawBackground: function(){
-    if(grh.ctx !== null){
-      grh.ctx.clearRect(0, 0, grh.dim.x, grh.dim.y);
-      grh.ctx.fillStyle = grh.colBack;
-      grh.ctx.fillRect(0, 0, grh.dim.x, grh.dim.y);
-    }
-  },
-  drawEdge: function(t_nd1, t_nd2){
-    if(grh.ctx !== null){
-      var d = grh.dist(t_nd1, t_nd2);
-      var fac = (1 - (d * d) / Math.pow(grh.maxEdgLen, 2));
-      if(fac >= 1 || fac < 0){ fac = 0.00001; } //prevent underflow, so lineWidth does not fallback to default
-      grh.ctx.lineWidth = grh.lineWidth * fac;
-      grh.ctx.shadowBlur = 0;
-      grh.ctx.beginPath();
-      grh.ctx.moveTo(t_nd1.pos.x, t_nd1.pos.y);
-      grh.ctx.lineTo(t_nd2.pos.x, t_nd2.pos.y);
-      grh.ctx.strokeStyle = grh.colEdge;
-      grh.ctx.stroke();
-    }
-  },
-  drawNode: function(t_nd){
-    if(grh.ctx !== null && t_nd !== null){
-      grh.ctx.fillStyle = grh.colNode;
-      grh.ctx.strokeStyle = grh.colNode;
-      grh.ctx.beginPath();
-      grh.ctx.arc(t_nd.pos.x, t_nd.pos.y, t_nd.size, 0, 2 * Math.PI);
-      grh.ctx.stroke();
-      grh.ctx.fill();
-    }
-  },
-  dist: function(t_nd1, t_nd2){
-    var x = t_nd1.pos.x - t_nd2.pos.x;
-    var y = t_nd1.pos.y - t_nd2.pos.y;
-    return Math.sqrt(x*x + y*y);
-  },
-  resize: function(){
-    grh.drawBackground();
-    grh.dim.x = window.innerWidth;
-    grh.dim.y = window.innerHeight;
-    if(grh.diagnostics !== undefined){
-      grh.diagnostics.diagX = grh.dim.x - 100;
-      grh.diagnostics.diagY = grh.dim.y - 40;
-    }
-    if(grh.ctx !== null){
-      grh.ctx.canvas.width = grh.dim.x;
-      grh.ctx.canvas.height = grh.dim.y;
-    }
-  },
-  init: function(){
-    grh.resize();
+atc.Physics = atc.Physics || function (t_instance) {
+  var instance = t_instance;
 
-    grh.nodeCount = Math.floor(grh.dim.x * grh.dim.y / grh.density);
-    //Init Matrix
-    grh.mtx = [];
-    for(var i = 0; i < grh.nodeCount; ++i){
-      grh.mtx[i] = [];
-      for(var j = 0; j < grh.nodeCount; ++j){
-        grh.mtx[i][j] = false;
+  function removeNodesOutOfBox () {
+    var nds = instance.getNodes();
+    var dim = instance.getDimensions();
+    var rem = 0;
+    for (let i = 0; i < nds.length; ++i) {
+      if (nds[i] === null) { console.log('nds null at: ' + i + ' nds.length = ' + nds.length); }
+      if (nds[i].pos.x < 0 || nds[i].pos.x > dim.x || nds[i].pos.y < 0 || nds[i].pos.y > dim.y) {
+        instance.removeNode(i);
+        ++rem;
       }
     }
-    //Add Nodes
-    for(var i = 0; i < grh.nodeCount; ++i){
-      grh.addNode(true);
+    for (let i = 0; i < rem; ++i) {
+      instance.addNode();
     }
-    //Add Edges
-    grh.tick.checkEdges();
-
-    grh.getContext();
-
-    grh.start();
-  },
-  start: function(){
-    if(!grh.started){
-      grh.started = true;
-      grh.runnerID = requestAnimationFrame(grh.runner);
-      console.log("Started Runner with ID:" + grh.runnerID);
-    }
-  },
-  stop: function(){
-    console.log("Trying to stop runner with ID: " + grh.runnerID);
-    if(grh.runnerID !== undefined || grh.runnerID !== null)
-      cancelAnimationFrame(grh.runnerID);
-    grh.runnerID = null;
-    grh.started = false;
-    console.log("Stopped Runner")
-  },
-  togglePause: function(){
-    if(grh.started){
-      grh.stop();
-    }else{
-      grh.start();
-    }
-  },
-  runner: function(){
-    grh.lastRun = grh.lastRun || Date.now();
-    var ts = Date.now();
-    var step = 1000/grh.fps;
-    if(grh.lastRun < ts - step){
-      var delta = ts - grh.lastRun;
-      if(delta >= step * 20) {
-        grh.panic(delta);
-        grh.lastRun = ts;
-        grh.runner();
-        return;
-      }
-      for(;delta >= step; delta -= step){
-        grh.tick.tick();
-      }
-      grh.render();
-      grh.lastRun = ts;
-    }
-    grh.runnerID = requestAnimationFrame(grh.runner);
-  },
-  panic: function(t_delta){
-    console.log("Runner paniced, couldn't keep up! Delta was: " + t_delta + "ms.");
-    console.log("Skipped " + Math.floor(t_delta / (1000/grh.fps))+ " update cycles." );
   }
-}
 
-grh.ui = grh.ui || (function(){
+  function checkEdges () {
+    var nds = instance.getNodes();
+    var edgLen = instance.getMaxEdgeLength();
+    for (let i = 0; i < nds.length - 1; ++i) {
+      for (let j = i + 1; j < nds.length; ++j) {
+        if (nds[i].distanceTo(nds[j]) > edgLen) {
+          instance.setEdge(i, j, false);
+        } else {
+          instance.setEdge(i, j, true);
+        }
+      }
+    }
+  }
+
+  function moveNodes () {
+    var nds = instance.getNodes();
+    var speedFactor = 1 / instance.getMaxFPS();
+    for (let idx = 0; idx < nds.length; ++idx) {
+      nds[idx].pos.x += nds[idx].vec.x * speedFactor;
+      nds[idx].pos.y += nds[idx].vec.y * speedFactor;
+    }
+  }
+
+  return {
+    tick: function () {
+      moveNodes();
+      removeNodesOutOfBox();
+      checkEdges();
+    }
+  };
+};
+
+atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
+  var instance = t_instance;
   var mouseDown = false;
   var focusedNode = null;
+  var lastX = null;
+  var lastY = null;
+  var el = t_el;
 
-  var findNode = function(t_x, t_y){
-    for(var i = 0; i < grh.nds.length; ++i){
-      var nd = grh.nds[i];
-      var x = 2; //Make Clicking easier
-      if(nd.pos.x + (nd.size + x) > t_x && nd.pos.x - (nd.size +x) < t_x){
-        if(nd.pos.y + (nd.size + x) > t_y && nd.pos.y - (nd.size + x) < t_y)
+  function findNode (t_x, t_y) {
+    var delta = 5;
+    var nds = instance.getNodes();
+    for (let i = 0; i < nds.length; ++i) {
+      var nd = nds[i];
+      if (nd.pos.x + (nd.size + delta) >= t_x && nd.pos.x - (nd.size + delta) <= t_x) {
+        if (nd.pos.y + (nd.size + delta) >= t_y && nd.pos.y - (nd.size - delta) <= t_y) {
           return nd;
+        }
       }
     }
     return null;
   }
 
-  var onMouseDown = function(event){
-    //console.log(event);
+  function onMouseDown (event) {
     mouseDown = true;
-    //event.clientX; event.clientY;
     var nd = findNode(event.clientX, event.clientY);
-    if(nd !== null){
-      nd.vecBak = nd.vec;
-      nd.vec = {x: 0, y:0};
+    if (nd !== null) {
       focusedNode = nd;
-
-      lastX = event.clientX;
-      lastY = event.clientY;
     }
   }
-  var onMouseUp = function(event){
-    //console.log(event);
-    mouseDown = false;
-    lastX = null;
-    lastY = null;
-    if(focusedNode !== null){ //Restore vector
-      focusedNode.vec = focusedNode.vecBak;
-      focusedNode.vecBak = undefined;
+
+  function onMouseMove (event) {
+    if (mouseDown && focusedNode !== null) {
+      focusedNode.pos.x = event.clientX;
+      focusedNode.pos.y = event.clientY;
     }
+  }
+
+  function onMouseUp (event) {
+    mouseDown = false;
     focusedNode = null;
   }
-  var lastX = null;
-  var lastY = null;
-  var onMouseMove = function(event){
-    if(mouseDown && focusedNode !== null){
-      if(lastX !== null && lastY !== null){
-        var dx = event.clientX - lastX;
-        var dy = event.clientY - lastY;
-        var nx = focusedNode.pos.x + dx;
-        var ny = focusedNode.pos.y + dy;
-        //Move Neighbours
-        var nbs = grh.getNeighbours(focusedNode.id);
-        for(var i = 0; i < nbs.length; ++i){
-          var edgLen = grh.dist(focusedNode, nbs[i]);
-          var newLen = grh.dist({pos : {x:nx, y:ny}}, nbs[i]);
-          if(edgLen < newLen){
-            var dLen = newLen - edgLen;
-            var mx = nx - nbs[i].pos.x;
-            var my = ny - nbs[i].pos.y;
-            var cor = dLen / Math.sqrt(mx*mx + my*my);
-            nbs[i].pos.x += mx * cor;
-            nbs[i].pos.y += my * cor;
-          }
-        }
 
-        focusedNode.pos.x = nx;
-        focusedNode.pos.y = ny;
-      }
-      lastX = event.clientX;
-      lastY = event.clientY;
-    }
-  }
   return {
-    attachTo: function(el){
+    bind: function () {
       el.addEventListener('mousedown', onMouseDown);
       el.addEventListener('mousemove', onMouseMove);
-      el.addEventListener('mouseup', onMouseUp);
       window.addEventListener('mouseup', onMouseUp);
+    },
+    unbind: function () {
+      el.removeEventListener('mousedown', onMouseDown);
+      el.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
     }
-  }
-})();
-
-grh.tick = grh.tick || {
-  tick: function(){
-    grh.tick.checkHitbox();
-    grh.tick.checkEdges();
-    if(grh.gravEnabled)
-      grh.tick.applyGravity();
-    grh.tick.moveNodes();
-  },
-  checkHitbox: function(){
-    var rem = 0;
-    for(var i = 0; i < grh.nodeCount; i++){
-      var nd = grh.nds[i];
-      if( nd.pos.x < 0 || nd.pos.x > grh.dim.x
-        ||nd.pos.y < 0 || nd.pos.y > grh.dim.y ){
-        grh.removeNode(i);
-        ++rem;
-      }
-    }
-    for(var i = 0; i < rem; ++i){
-      grh.addNode();
-    }
-  },
-  checkEdges: function(){
-    var dist = function(t_nd1, t_nd2){
-      var x = t_nd1.pos.x - t_nd2.pos.x;
-      var y = t_nd1.pos.y - t_nd2.pos.y;
-      return Math.sqrt(x*x + y*y);
-    }
-    var edglen = grh.maxEdgLen;
-    for(var i = 0; i < grh.nodeCount -1; ++i){ //Letzte muss nicht geprÃƒÂ¼ft werden
-      var nb = grh.getNeighbours(i);
-      for(var j = 0; j < nb.length; ++j){
-        if(dist(grh.nds[i], nb[j]) > edglen) //Make the edges pop at greater distances
-          grh.setEdge(i, nb[j].id, false);
-      }
-    }
-    for(var i = 0; i < grh.nodeCount -1;++i){
-      var nd = grh.nds[i];
-      var edges = grh.getNeighbours(i).length;
-      for(var j = i +1; j < grh.nodeCount; ++j){
-        if(dist(nd, grh.nds[j]) < edglen && edges < grh.maxEdges){
-          if(grh.getNeighbours(j).length < grh.maxEdges){
-            grh.setEdge(nd.id, j, true);
-            ++edges;
-          }
-        }
-      }
-    }
-  },
-  applyGravity: function(){
-    var mass = function(t_r){
-      return 1.33 * Math.PI * Math.pow(t_r, 3);
-    };
-    var direction = function(t_nd1, t_nd2){
-      var m = {};
-      m.x = t_nd2.pos.x - t_nd1.pos.x;
-      m.y = t_nd2.pos.y - t_nd1.pos.y;
-      m.len = Math.sqrt(m.x * m.x + m.y * m.y);
-      return m;
-    };
-    var grav = function(t_s1, t_s2, dist){
-      var f = mass(t_s1) * mass(t_s2)  / Math.pow(dist, 2);
-      return f * grh.gravFac;
-    };
-    for(var i = 0; i < grh.nodeCount -1; ++i){
-      var nd = grh.nds[i];
-      nd.tvec = nd.tvec || { 'x': 0, 'y': 0};
-      for(var j = i+1; j < grh.nodeCount; ++j){
-        var nd2 = grh.nds[j];
-        nd2.tvec = nd2.tvec || { 'x': 0, 'y': 0};
-        var d = grh.dist(nd, nd2);
-        if(d < grh.maxEdgLen){
-          var f = grav(nd.size, nd2.size, d);
-          //Betrag v: f/m * t
-          var m = direction(nd, nd2);
-          var cor = (f/mass(nd.size) * (1/grh.fps) ) / m.len; //Korrekturfaktor für m
-          //console.log("m.len: " + m.len + "  cor: " + cor + "    v:" + m.len * cor);
-          nd.tvec.x += m.x * cor;
-          nd.tvec.y += m.y * cor;
-          m.x = m.x * -1; m.y = m.y * -1; //Switch direction for other node
-          cor = (f/mass(nd2.size) * 1/grh.fps) / m.len;
-          nd2.tvec.x += m.x * cor;
-          nd2.tvec.y += m.y * cor;
-        }
-      }
-    }
-    //Apply Vectors
-    for(var i = 0; i < grh.nodeCount; ++i){
-      var nd = grh.nds[i];
-      //console.log(nd.tvec);
-      nd.vec.x += nd.tvec.x;
-      nd.vec.y += nd.tvec.y;
-      nd.tvec = null;
-    }
-  },
-  moveNodes: function(){
-    for(var i = 0; i < grh.nodeCount; i++){
-      var nd = grh.nds[i];
-      nd.pos.x += nd.vec.x * (1 / grh.fps);
-      nd.pos.y += nd.vec.y * (1 / grh.fps);
-    }
-  }
+  };
 };
 
-grh.diagnostics = grh.diagnostics || {
-  fpsOT: Array(30), //stores the last X seconds of fps
-  fpsOT_idx: 0,
-  fpsOT_lastSecond: 0,
-  diagX: 20,
-  diagY: 20,
-  diagBackCol: "rgba(0,0,0, 0.5)",
-  writeTick: function(){
-    var curMS = function(){ return Date.now();};
-    var begOfSecond = function(){var date = new Date(); date.setMilliseconds(0); return date.getTime();}
-    var d = grh.diagnostics;
+atc.Diagnostics = atc.Diagnostics || function (t_instance) {
+  var instance = t_instance;
+  var frames = Array(30); // Store last 30 average fps
+  var idx = 0; // We are implementing a queue so we need a folding index
+  var lastSecond = 0;
 
-    //Check if idx points to current second
-    if(d.fpsOT_lastSecond < curMS() - 1000){
-      ++d.fpsOT_idx;
-      if(d.fpsOT_idx == d.fpsOT.length) d.fpsOT_idx = 0;
-      d.fpsOT_lastSecond = begOfSecond();
-      d.fpsOT[d.fpsOT_idx] = 0;
-    }else{
-      d.fpsOT[d.fpsOT_idx]++;
+  function getStampOfSecond () {
+    var d = new Date();
+    d.setMilliseconds(0);
+    return d.getTime();
+  }
+  function HSVtoRGB (t_H, t_S, t_V) { // t_H [0, 360], t_S, t_V [0,1]
+    var h = Math.round(t_H / 60);
+    var f = t_H / 60 - h;
+    var p = t_V * (1 - t_S);
+    var q = t_V * (1 - t_S * f);
+    var t = t_V * (1 - t_S * (1 - f));
+    var rgb = {};
+    switch (h) {
+      case 1: rgb = {r: q, g: t_V, b: p}; break;
+      case 2: rgb = {r: p, g: t_V, b: t}; break;
+      case 3: rgb = {r: p, g: q, b: t_V}; break;
+      case 4: rgb = {r: t, g: p, b: t_V}; break;
+      case 5: rgb = {r: t_V, g: p, b: q}; break;
+      default:rgb = {r: t_V, g: t, b: p}; break;
     }
-  },
-  drawDiag: function(){
-    if(grh.ctx !== undefined){
-      var d = grh.diagnostics;
-      grh.ctx.fillStyle = d.diagBackCol;
-      grh.ctx.fillRect(d.diagX, d.diagY, d.fpsOT.length * 2 + 35,  30);
+    rgb.r = Math.round(rgb.r * 255);
+    rgb.g = Math.round(rgb.g * 255);
+    rgb.b = Math.round(rgb.b * 255);
+    return rgb;
+  }
 
-      var xRight = d.diagX + d.fpsOT.length * 2;
-      var yBot = d.diagY + 25;
-      for(var i = 0; i < d.fpsOT.length -1; i++){ //Dont render current frame stats
-        var idx = (d.fpsOT_idx -1 ) - i; //Dont render current bar
-        if(idx < 0) idx = (d.fpsOT.length) + idx;
-        var x = xRight -2 * i;
-        var fps = d.fpsOT[idx] /grh.fps;
-        //HSVtoRGB(0,1,1); Red //HSVtoRGB(120,1,1) //Green
-        grh.ctx.fillStyle = RedToGreenGrad(fps);
-        grh.ctx.fillRect(x-2, yBot, 2, -20 * ( d.fpsOT[idx] /grh.fps ));
+  function RGBtoString (t_rgb) {
+    return 'rgb(' + t_rgb.r + ',' + t_rgb.g + ',' + t_rgb.b + ')';
+  }
+
+  return {
+    writeFrame: function () {
+      if (lastSecond >= Date.now() - 1000) {
+        frames[idx] = frames[idx] + 1;
+      } else {
+        idx = idx < frames.length - 1 ? idx + 1 : 0;
+        frames[idx] = 1;
+        lastSecond = getStampOfSecond();
       }
-
-      grh.ctx.font = "9px Arial";
-      grh.ctx.fillStyle = "white";
-      var cfps = d.fpsOT[ d.fpsOT_idx == 0 ? d.fpsOT.length -1 : d.fpsOT_idx -1 ] || 0;
-      grh.ctx.fillText(grh.fps + " fps", xRight + 5, yBot -15); //Top fps
-      grh.ctx.fillStyle = RedToGreenGrad(cfps / grh.fps);
-      grh.ctx.fillText(cfps + " fps", xRight + 5, yBot); //Bot/cur fps
+    },
+    drawDiagWindow: function (t_ctx, t_x, t_y) {
+      var x = 5 + 2 * frames.length;
+      var y = 30;
+      var fps = instance.getMaxFPS();
+      t_ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      t_ctx.fillRect(t_x, t_y, x + 40, y);
+      for (let i = 0; i < frames.length - 1; ++i) { // Need to render one less
+        var j = (idx - 1) - i; // Dont render current idx when starting at i = 0
+        if (j < 0) j = frames.length + j;
+        t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * frames[j] / fps, 1, 1));
+        t_ctx.fillRect(t_x + x - i * 2, t_y + 25, -2, -20 * frames[j] / fps);
+      }
+      var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1];
+      if (lastFps === undefined) lastFps = 0;
+      t_ctx.font = '9x Arial';
+      t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * lastFps / fps, 1, 1));
+      t_ctx.fillText(lastFps + ' fps', t_x + x + 5, t_y + 12);
+      t_ctx.fillStyle = 'white';
+      t_ctx.fillText(fps + ' fps', t_x + x + 5, t_y + 24);
     }
-  }
+  };
 };
-
-var rnd = {
-  between: function(low, high){
-    if(low > high) {var t = low; low = high; high = t;}
-    var diff = Math.abs(high - low);
-    return (Math.random() * diff) + low;
-  },
-  betweenInt: function(low, high){
-    return Math.round(rnd.between(low,high));
-  },
-  either: function(x, y){
-    return Math.random() > 0.5 ? x : y;
-  }
-};
-var HSVtoRGB = function(t_H, t_S, t_V){ // t_H [0, 360], t_S, t_V [0,1]
-  var h = Math.round(t_H / 60);
-  var f = t_H / 60 - h;
-  var p = t_V * (1 - t_S);
-  var q = t_V * (1 - t_S * f);
-  var t = t_V * (1 - t_S * (1-f));
-  var rgb = {};
-  switch (h) {
-    case 1: rgb = {r: q, g: t_V, b: p}; break;
-    case 2: rgb = {r: p, g: t_V, b: t}; break;
-    case 3: rgb = {r: p, g: q, b: t_V}; break;
-    case 4: rgb = {r: t, g: p, b: t_V}; break;
-    case 5: rgb = {r: t_V, g: p, b: q}; break;
-    default:rgb = {r: t_V, g: t, b: p}; break;
-  }
-  rgb.r = Math.round(rgb.r * 255);
-  rgb.g = Math.round(rgb.g * 255);
-  rgb.b = Math.round(rgb.b * 255);
-  return rgb;
-};
-var RedToGreenGrad = function(t_fac){
-  var rgb = HSVtoRGB(120 * t_fac, 1, 1);
-  return "rgb("+rgb.r+","+rgb.g+","+rgb.b+")";
-}
-window.addEventListener('load', grh.init);
-window.addEventListener('resize', grh.resize);
-
-window.addEventListener('load', function(){
-  grh.ui.attachTo(document.getElementById('canvas'));
-})
