@@ -136,7 +136,7 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   var canvas = t_el;
   var dimension = { x: undefined, y: undefined };
   var loopID = null;
-  var lastRun = null;
+  var lastRun = 0;
   var nodes = [];
   var mtx = [];
   var maxNodes = 0;
@@ -196,15 +196,15 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     mtx = edgMtx;
   }
   function mainLoop () {
-    if (lastRun === null || lastRun < Date.now() - 1000 / conf.maxFPS) {
-      var ts = Date.now();
-      var step = 1000 / conf.maxFPS;
-      var delta = lastRun !== null ? ts - lastRun : 0;
+    if (lastRun === 0 || lastRun < (window.performance.now() | 0) - (1000 / conf.maxFPS) | 0) {
+      var ts = window.performance.now() | 0;
+      var step = ((1000 | 0) / (conf.maxFPS | 0)) | 0;
+      var delta = ts - (lastRun === 0 ? step : lastRun);
       do {
         physics.tick();
       } while ((delta -= step) > step);
       render.doRenderCycle();
-      lastRun = ts;
+      lastRun = ts - (delta % step);
     }
     loopID = window.requestAnimationFrame(mainLoop);
   }
@@ -265,7 +265,7 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   };
   this.getDiagnosticsEnabled = function () {
     return conf.diagnosticsEnabled;
-  },
+  };
   this.getDimensions = function () {
     return dimension;
   };
@@ -376,6 +376,7 @@ atc.Render = atc.Render || function (t_el, t_instance) {
 
   return {
     doRenderCycle: function () {
+      // var begin = window.performance.now();
       drawBackground();
       var nds = instance.getNodes();
       for (let i = 0; i < nds.length; ++i) {
@@ -389,6 +390,8 @@ atc.Render = atc.Render || function (t_el, t_instance) {
           }
         }
       }
+      // var deltaEdges = window.performance.now() - begin;
+      // var beginNodes = window.performance.now();
       for (let i = 0; i < nds.length; ++i) {
         drawNode(nds[i]);
       }
@@ -396,6 +399,9 @@ atc.Render = atc.Render || function (t_el, t_instance) {
         diagnostics.writeFrame();
         diagnostics.drawDiagWindow(ctx, 10, 10);
       }
+      // var deltaNodes = window.performance.now() - beginNodes;
+      // var delta = window.performance.now() - begin;
+      // console.log('Render took: ' + Math.round(delta, 2) + 'ms' + ' Edges: ' + Math.round(deltaEdges, 2) + 'ms  Nodes: ' + Math.round(deltaNodes, 2) + 'ms');
     }
   };
 };
@@ -455,8 +461,6 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
   var instance = t_instance;
   var mouseDown = false;
   var focusedNode = null;
-  var lastX = null;
-  var lastY = null;
   var el = t_el;
 
   function findNode (t_x, t_y) {
