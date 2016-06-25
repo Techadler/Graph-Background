@@ -481,9 +481,9 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
     mouseDown = true;
     var nd = findNode(event.clientX, event.clientY);
     if (nd !== null) {
-      focusedNode = nd;
-      nd.vec = nd.vecBak;
+      nd.vecBak = nd.vec;
       nd.vec = {x: 0, y: 0};
+      focusedNode = nd;
     }
   }
 
