@@ -482,6 +482,8 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
     var nd = findNode(event.clientX, event.clientY);
     if (nd !== null) {
       focusedNode = nd;
+      nd.vec = nd.vecBak;
+      nd.vec = {x: 0, y: 0};
     }
   }
 
@@ -494,7 +496,11 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
 
   function onMouseUp (event) {
     mouseDown = false;
-    focusedNode = null;
+    if (focusedNode !== null) {
+      focusedNode.vec = focusedNode.vecBak;
+      delete focusedNode.vecBak;
+      focusedNode = null;
+    }
   }
 
   return {
