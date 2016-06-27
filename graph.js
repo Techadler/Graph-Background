@@ -66,6 +66,22 @@ atc.base = atc.base || (function () {
       instances[id] = new atc.Instance(t_el, t_conf, id);
       return id;
     },
+    getInstance: function (t_id) {
+      if (instances[t_id] !== undefined) {
+        return instances[t_id];
+      }
+      return null;
+    },
+    getInstanceByElement: function (t_el) {
+      if (t_el !== undefined) {
+        for (let id in instances) {
+          if (instances[id].getElement() === t_el) {
+            return instances[id];
+          }
+        }
+      }
+      return null;
+    },
     getInstanceIDs: function () {
       return Object.keys(instances);
     },
@@ -259,6 +275,11 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     canvas.setAttribute('width', 0);
     canvas.setAttribute('height', 0);
   };
+  this.enableDiagnostics = function (t_bool) {
+    if (t_bool === true || t_bool === false) {
+      conf.diagnosticsEnabled = t_bool;
+    }
+  };
   this.getBackColor = function () {
     return conf.backColor;
   };
@@ -273,6 +294,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   };
   this.getEdgeWidth = function () {
     return conf.edgeWidth;
+  };
+  this.getElement = function () {
+    return canvas;
   };
   this.getMaxEdgeLength = function () {
     return conf.maxEdgeLength;
@@ -312,9 +336,28 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     }
     nodes[t_id] = null;
   };
+  this.setBackColor = function (t_col) {
+    if (t_col !== undefined) {
+      conf.backColor = t_col;
+    }
+  };
   this.setEdge = function (t_id1, t_id2, t_bool) {
-    mtx[t_id1][t_id2] = t_bool;
-    mtx[t_id2][t_id1] = t_bool;
+    if (t_id1 >= 0 && t_id1 < mtx.length &&
+        t_id2 >= 0 && t_id2 < mtx.length &&
+       (t_bool || t_bool === false)) {
+      mtx[t_id1][t_id2] = t_bool;
+      mtx[t_id2][t_id1] = t_bool;
+    }
+  };
+  this.setEdgeColor = function (t_col) {
+    if (t_col !== undefined) {
+      conf.edgeColor = t_col;
+    }
+  };
+  this.setNodeColor = function (t_col) {
+    if (t_col !== undefined) {
+      conf.nodeColor = t_col;
+    }
   };
   this.start = function () {
     loopID = window.requestAnimationFrame(mainLoop);
@@ -394,9 +437,13 @@ atc.Render = atc.Render || function (t_el, t_instance) {
       for (let i = 0; i < nds.length; ++i) {
         drawNode(nds[i]);
       }
-      if (diagnostics !== null) {
-        diagnostics.tick();
-        diagnostics.drawDiagWindow(ctx, 10, 10);
+      if (instance.getDiagnosticsEnabled()) {
+        if (diagnostics !== null) {
+          diagnostics.tick();
+          diagnostics.drawDiagWindow(ctx, 10, 10);
+        } else {
+          diagnostics = new atc.Diagnostics(instance);
+        }
       }
       // var deltaNodes = window.performance.now() - beginNodes;
       // var delta = window.performance.now() - begin;
