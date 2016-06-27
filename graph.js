@@ -87,11 +87,10 @@ atc.base = atc.base || (function () {
       return {
         edgeColor: '#e4e4e4',
         nodeColor: '#ffffff',
-        backColor: '#0d6aa4', // #1286d0
+        backColor: '#0d6aa4',
         nodeMinSize: 2,
         nodeMaxSize: 5,
         edgeWidth: 1.5,
-        density: 9000, // Smaller is denser
 
         gravity: false,
         gravityStrength: 2,
@@ -592,8 +591,9 @@ atc.Diagnostics = atc.Diagnostics || function (t_instance) {
         t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * fps / maxFPS, 1, 1));
         t_ctx.fillRect(t_x + x - i * 2, t_y + 25, -2, -20 * fps / maxFPS);
       }
-      var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1] * resolution;
+      var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1];
       if (lastFps === undefined) lastFps = 0;
+      lastFps *= resolution;
       t_ctx.font = '9x Arial';
       t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * lastFps / maxFPS, 1, 1));
       t_ctx.fillText(lastFps + ' fps', t_x + x + 5, t_y + 12);
