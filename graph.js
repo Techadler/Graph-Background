@@ -396,7 +396,7 @@ atc.Render = atc.Render || function (t_el, t_instance) {
         drawNode(nds[i]);
       }
       if (diagnostics !== null) {
-        diagnostics.writeFrame();
+        diagnostics.tick();
         diagnostics.drawDiagWindow(ctx, 10, 10);
       }
       // var deltaNodes = window.performance.now() - beginNodes;
@@ -479,18 +479,25 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
 
   function onMouseDown (event) {
     mouseDown = true;
-    var nd = findNode(event.clientX, event.clientY);
+    var nd = findNode(event.layerX, event.layerY);
     if (nd !== null) {
       nd.vecBak = nd.vec;
       nd.vec = {x: 0, y: 0};
       focusedNode = nd;
+      el.style.cursor = 'move';
     }
   }
 
   function onMouseMove (event) {
     if (mouseDown && focusedNode !== null) {
-      focusedNode.pos.x = event.clientX;
-      focusedNode.pos.y = event.clientY;
+      focusedNode.pos.x = event.layerX;
+      focusedNode.pos.y = event.layerY;
+    } else {
+      if (findNode(event.layerX, event.layerY) !== null) { // Takes around 0.5 ms
+        el.style.cursor = 'pointer';
+      } else {
+        el.style.cursor = 'default';
+      }
     }
   }
 
@@ -501,6 +508,7 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
       delete focusedNode.vecBak;
       focusedNode = null;
     }
+    el.style.cursor = 'default';
   }
 
   return {
@@ -520,12 +528,20 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
 atc.Diagnostics = atc.Diagnostics || function (t_instance) {
   var instance = t_instance;
   var frames = Array(30); // Store last 30 average fps
+  var resolution = 2; // 1 equals to 1 per Second, 2 would be 2 per Second
   var idx = 0; // We are implementing a queue so we need a folding index
   var lastSecond = 0;
 
   function getStampOfSecond () {
     var d = new Date();
-    d.setMilliseconds(0);
+    if (resolution === 1) {
+      d.setMilliseconds(0);
+    } else {
+      var ms = d.getMilliseconds();
+      var step = (1000 / resolution) | 0;
+      ms = ((ms / step) | 0) * step;
+      d.setMilliseconds(ms);
+    }
     return d.getTime();
   }
   function HSVtoRGB (t_H, t_S, t_V) { // t_H [0, 360], t_S, t_V [0,1]
@@ -554,8 +570,8 @@ atc.Diagnostics = atc.Diagnostics || function (t_instance) {
   }
 
   return {
-    writeFrame: function () {
-      if (lastSecond >= Date.now() - 1000) {
+    tick: function () {
+      if (lastSecond >= Date.now() - (1000 / resolution)) {
         frames[idx] = frames[idx] + 1;
       } else {
         idx = idx < frames.length - 1 ? idx + 1 : 0;
@@ -566,22 +582,23 @@ atc.Diagnostics = atc.Diagnostics || function (t_instance) {
     drawDiagWindow: function (t_ctx, t_x, t_y) {
       var x = 5 + 2 * frames.length;
       var y = 30;
-      var fps = instance.getMaxFPS();
+      var maxFPS = instance.getMaxFPS();
       t_ctx.fillStyle = 'rgba(0,0,0,0.5)';
       t_ctx.fillRect(t_x, t_y, x + 40, y);
       for (let i = 0; i < frames.length - 1; ++i) { // Need to render one less
         var j = (idx - 1) - i; // Dont render current idx when starting at i = 0
         if (j < 0) j = frames.length + j;
-        t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * frames[j] / fps, 1, 1));
-        t_ctx.fillRect(t_x + x - i * 2, t_y + 25, -2, -20 * frames[j] / fps);
+        var fps = frames[j] * resolution;
+        t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * fps / maxFPS, 1, 1));
+        t_ctx.fillRect(t_x + x - i * 2, t_y + 25, -2, -20 * fps / maxFPS);
       }
-      var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1];
+      var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1] * resolution;
       if (lastFps === undefined) lastFps = 0;
       t_ctx.font = '9x Arial';
-      t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * lastFps / fps, 1, 1));
+      t_ctx.fillStyle = RGBtoString(HSVtoRGB(120 * lastFps / maxFPS, 1, 1));
       t_ctx.fillText(lastFps + ' fps', t_x + x + 5, t_y + 12);
       t_ctx.fillStyle = 'white';
-      t_ctx.fillText(fps + ' fps', t_x + x + 5, t_y + 24);
+      t_ctx.fillText(maxFPS + ' fps', t_x + x + 5, t_y + 24);
     }
   };
 };
