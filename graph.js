@@ -114,6 +114,7 @@ atc.base = atc.base || (function () {
         bounceNodes: true,
         bounceAtWalls: true,
         wallBounceDecay: 0.9,
+        drawQuadTree: false,
 
         height: 0,
         maxHeight: 0,
@@ -145,6 +146,7 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   var nodes = [];
   var mtx = [];
   var maxNodes = 0;
+  var quadTree = null;
 
   function populate () {
     for (let i = 0; i < maxNodes; ++i) {
@@ -286,6 +288,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   this.getDimensions = function () {
     return dimension;
   };
+  this.getDrawQuadTree = function () {
+    return conf.drawQuadTree;
+  };
   this.getEdgeColor = function () {
     return conf.edgeColor;
   };
@@ -318,6 +323,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   };
   this.getNodeColor = function () {
     return conf.nodeColor;
+  };
+  this.getQuadTree = function () {
+    return quadTree;
   };
   this.getState = function () {
     return {
@@ -361,6 +369,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     if (t_col !== undefined) {
       conf.nodeColor = t_col;
     }
+  };
+  this.setQuadTree = function (t_tree) {
+    quadTree = t_tree;
   };
   this.start = function () {
     loopID = window.requestAnimationFrame(mainLoop);
@@ -418,11 +429,43 @@ atc.Render = atc.Render || function (t_el, t_instance) {
     ctx.stroke();
   }
 
+  function drawQuadTree (t_tree) {
+    ctx.font = '12px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = 'black';
+    if (t_tree !== null) {
+      if (t_tree.isSplit) {
+        var b = t_tree.bounds;
+        var c = Color.fromHSV(120 + 40 * t_tree.lvl, 1, 1);
+        ctx.strokeStyle = c.toRGBString();
+        ctx.lineWidth = 1;
+        { // Draw our split axis
+          ctx.beginPath();
+          ctx.moveTo(b.midx, b.y1);
+          ctx.lineTo(b.midx, b.y2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(b.x1, b.midy);
+          ctx.lineTo(b.x2, b.midy);
+          ctx.stroke();
+        }
+        ctx.fillText('Spares:' + t_tree.spares.length, b.midx, b.midy);
+        for (let i = 0; i < t_tree.nodes.length; ++i) {
+          drawQuadTree(t_tree.nodes[i]);
+        }
+      } else {
+        ctx.fillText('Objects:' + t_tree.objects.length, t_tree.bounds.midx, t_tree.bounds.midy);
+      }
+    }
+  }
   var diagnostics = !instance.getDiagnosticsEnabled() ? null : new atc.Diagnostics(instance);
 
   return {
     doRenderCycle: function () {
       drawBackground();
+      if (instance.getDrawQuadTree()) {
+        drawQuadTree(instance.getQuadTree());
+      }
       var nds = instance.getNodes();
       for (let i = 0; i < nds.length - 1; ++i) {
         var nd = nds[i];
@@ -544,6 +587,7 @@ atc.Physics = atc.Physics || function (t_instance) {
     var nds = instance.getNodes();
     var dim = instance.getDimensions();
     var quad = new QuadTree(0, new Rectangle(0, 0, dim.x, dim.y));
+    instance.setQuadTree(quad);
     quad.addItems(nds);
     for (let i = 0; i < nds.length; ++i) {
       var nd = nds[i];
@@ -766,12 +810,13 @@ atc.Diagnostics = atc.Diagnostics || function (t_instance) {
       var lastFps = frames[idx === 0 ? frames.length - 1 : idx - 1];
       if (lastFps === undefined) lastFps = 0;
       lastFps *= resolution;
-      t_ctx.font = '9x Arial';
+      t_ctx.font = '10px Arial';
+      t_ctx.textAlign = 'right';
       var col = Color.fromHSV(120 * lastFps / maxFPS, 1, 1);
       t_ctx.fillStyle = col.toRGBString();
-      t_ctx.fillText(lastFps + ' fps', t_x + x + 5, t_y + 12);
+      t_ctx.fillText(lastFps + ' fps', t_x + x + 35, t_y + 12);
       t_ctx.fillStyle = 'white';
-      t_ctx.fillText(maxFPS + ' fps', t_x + x + 5, t_y + 24);
+      t_ctx.fillText(maxFPS + ' fps', t_x + x + 35, t_y + 24);
     }
   };
 };
@@ -886,8 +931,8 @@ function Rectangle (t_x1, t_y1, t_x2, t_y2) {
   this.x2 = t_x2;
   this.y1 = t_y1;
   this.y2 = t_y2;
-  this.xmid = Math.floor((t_x2 - t_x1) / 2) + t_x1;
-  this.ymid = Math.floor((t_y2 - t_y1) / 2) + t_y1;
+  this.midx = Math.floor((t_x2 - t_x1) / 2) + t_x1;
+  this.midy = Math.floor((t_y2 - t_y1) / 2) + t_y1;
 }
 
 function QuadTree (t_lvl, t_rect) {
@@ -900,64 +945,6 @@ function QuadTree (t_lvl, t_rect) {
   this.nodes = [];
   this.isSplit = false;
 }
-QuadTree.prototype.addItems = function (t_arr) {
-  for (let i in t_arr) {
-    this.addItem(t_arr[i]);
-  }
-};
-QuadTree.prototype.split = function () {
-  if (!this.isSplit) {
-    this.nodes = Array(4);
-    this.nodes[0] = new QuadTree(this.lvl + 1, new Rectangle(0, 0, this.bounds.xmid, this.bounds.ymid)); // TopLeft
-    this.nodes[1] = new QuadTree(this.lvl + 1, new Rectangle(this.bounds.xmid, 0, this.bounds.x2, this.bounds.ymid)); // Top right
-    this.nodes[2] = new QuadTree(this.lvl + 1, new Rectangle(this.bounds.xmid, this.bounds.ymid, this.bounds.x2, this.bounds.y2)); // Bottom right
-    this.nodes[3] = new QuadTree(this.lvl + 1, new Rectangle(0, this.bounds.ymid, this.bounds.xmid, this.bounds.y2)); // Bottom left
-    this.isSplit = true;
-    // Move Objects in their Sectors
-    for (let i = 0; i < this.objects.length; ++i) {
-      var obj = this.objects[i];
-      if (this.isSpare(obj)) {
-        this.spares.push(obj);
-      } else {
-        var s = this.getSector(obj.pos.x, obj.pos.y);
-        this.nodes[s].addItem(obj);
-      }
-    }
-    this.objects = null;
-  }
-};
-QuadTree.prototype.isSpare = function (t_nd) {
-  var fac = 3;
-  if (t_nd.pos.x >= this.bounds.midx - t_nd.size * fac && t_nd.pos.x <= this.bounds.midx + t_nd.size * fac) {
-    return true;
-  }
-  if (t_nd.pos.y >= this.bounds.midy - t_nd.size * fac && t_nd.pos.y <= this.bounds.midy + t_nd.size * fac) {
-    return true;
-  }
-  return false;
-};
-QuadTree.prototype.getSector = function (t_x, t_y) {
-  /* Sectors are placed this way:
-  1 | 2
-  ---|---
-  4 | 3
-  */
-  var xmid = Math.floor((this.bounds.x2 - this.bounds.x1) / 2) + this.bounds.x1;
-  var ymid = Math.floor((this.bounds.y2 - this.bounds.y1) / 2) + this.bounds.y1;
-  if (t_x > this.bounds.x1 && t_x < xmid) { // Sector 1 or 4
-    if (t_y > this.bounds.y1 && t_y < ymid) {
-      return 0; // Sector 1
-    } else {
-      return 3; // Sector 4
-    }
-  } else {
-    if (t_x > this.bounds.y1 && t_y < ymid) {
-      return 1; // Sector 2
-    } else {
-      return 2; // Sector 3
-    }
-  }
-};
 QuadTree.prototype.addItem = function (t_item) {
   if (!this.isSplit) {
     if (this.objects.length + 1 > this.maxObjects && this.lvl <= this.maxLvl) {
@@ -976,6 +963,41 @@ QuadTree.prototype.addItem = function (t_item) {
     }
   }
 };
+QuadTree.prototype.addItems = function (t_arr) {
+  for (let i in t_arr) {
+    this.addItem(t_arr[i]);
+  }
+};
+QuadTree.prototype.isSpare = function (t_nd) {
+  var fac = 1.5;
+  if (t_nd.pos.x >= this.bounds.midx - t_nd.size * fac && t_nd.pos.x <= this.bounds.midx + t_nd.size * fac) {
+    return true;
+  }
+  if (t_nd.pos.y >= this.bounds.midy - t_nd.size * fac && t_nd.pos.y <= this.bounds.midy + t_nd.size * fac) {
+    return true;
+  }
+  return false;
+};
+QuadTree.prototype.getSector = function (t_x, t_y) {
+  /* Sectors are placed this way:
+  1 | 2
+  --|--
+  4 | 3
+  */
+  if (t_x > this.bounds.x1 && t_x < this.bounds.midx) { // Left - Sector 1 or 4
+    if (t_y > this.bounds.y1 && t_y < this.bounds.midy) {
+      return 0; // Sector 1
+    } else {
+      return 3; // Sector 4
+    }
+  } else {
+    if (t_y > this.bounds.y1 && t_y < this.bounds.midy) {
+      return 1; // Sector 2
+    } else {
+      return 2; // Sector 3
+    }
+  }
+};
 QuadTree.prototype.queryItems = function (t_x, t_y) {
   var arr = [];
   arr = arr.concat(this.spares);
@@ -987,4 +1009,26 @@ QuadTree.prototype.queryItems = function (t_x, t_y) {
     arr = arr.concat(res);
   }
   return arr;
+};
+QuadTree.prototype.split = function () {
+  if (!this.isSplit) {
+    this.nodes = Array(4);
+    var b = this.bounds;
+    this.nodes[0] = new QuadTree(this.lvl + 1, new Rectangle(b.x1, b.y1, b.midx, b.midy)); // TopLeft
+    this.nodes[1] = new QuadTree(this.lvl + 1, new Rectangle(b.midx, b.y1, b.x2, b.midy)); // Top right
+    this.nodes[2] = new QuadTree(this.lvl + 1, new Rectangle(b.midx, b.midy, b.x2, b.y2)); // Bottom right
+    this.nodes[3] = new QuadTree(this.lvl + 1, new Rectangle(b.x1, b.midy, b.midx, b.y2)); // Bottom left
+    this.isSplit = true;
+    // Move Objects in their Sectors
+    for (let i = 0; i < this.objects.length; ++i) {
+      var obj = this.objects[i];
+      if (this.isSpare(obj)) {
+        this.spares.push(obj);
+      } else {
+        var s = this.getSector(obj.pos.x, obj.pos.y);
+        this.nodes[s].addItem(obj);
+      }
+    }
+    this.objects = [];
+  }
 };
