@@ -103,13 +103,17 @@ atc.base = atc.base || (function () {
       return {
         edgeColor: '#e4e4e4',
         nodeColor: '#ffffff',
+        nodeBorderColor: '#e4e4e4',
         backColor: '#0d6aa4',
         nodeMinSize: 2,
         nodeMaxSize: 5,
         edgeWidth: 1.5,
 
-        gravity: false,
-        gravityStrength: 2,
+        // Physics
+        electricalForce: false,
+        bounceNodes: true,
+        bounceAtWalls: true,
+        wallBounceDecay: 0.9,
 
         height: 0,
         maxHeight: 0,
@@ -141,7 +145,6 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   var nodes = [];
   var mtx = [];
   var maxNodes = 0;
-  setMaxNodes(conf.maxNodes);
 
   function populate () {
     for (let i = 0; i < maxNodes; ++i) {
@@ -171,30 +174,6 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     var y = Math.random() * 2 * conf.maxSpeed - conf.maxSpeed;
     return new Vector(x, y);
   }
-  function setMaxNodes (t_size) {
-    if (t_size < maxNodes) { // need to delete
-      nodes = nodes.splice(t_size - 1, maxNodes - t_size);
-    } else { // Append null values up to t_size
-      var l = nodes.length;
-      nodes.length = t_size;
-      nodes.fill(null, l);
-    }
-    var edgMtx = Array(t_size);
-    for (let i = 0; i < t_size; ++i) { // Initialize rows and copy values if possible
-      edgMtx[i] = Array(t_size);
-      if (i < mtx.length) { // Copy the rows if possible
-        var j;
-        for (j = 0; j < mtx.length && j < t_size; ++j) {
-          edgMtx[i][j] = mtx[i][j];
-        }
-        edgMtx[i].fill(false, j, t_size);
-      } else {
-        edgMtx[i].fill(false);
-      }
-    }
-    maxNodes = t_size;
-    mtx = edgMtx;
-  }
   function mainLoop () {
     if (lastRun === 0 || lastRun < (window.performance.now() | 0) - (1000 / conf.maxFPS) | 0) {
       var ts = window.performance.now() | 0;
@@ -208,7 +187,6 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     }
     loopID = window.requestAnimationFrame(mainLoop);
   }
-
   function setDimension (t_el) {
     // width: 0 -> grow
       // maxWidth: -> growLimit
@@ -234,7 +212,32 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     t_el.setAttribute('width', dimension.x);
     t_el.setAttribute('height', dimension.y);
   }
+  function setMaxNodes (t_size) {
+    if (t_size < maxNodes) { // need to delete
+      nodes = nodes.splice(t_size - 1, maxNodes - t_size);
+    } else { // Append null values up to t_size
+      var l = nodes.length;
+      nodes.length = t_size;
+      nodes.fill(null, l);
+    }
+    var edgMtx = Array(t_size);
+    for (let i = 0; i < t_size; ++i) { // Initialize rows and copy values if possible
+      edgMtx[i] = Array(t_size);
+      if (i < mtx.length) { // Copy the rows if possible
+        var j;
+        for (j = 0; j < mtx.length && j < t_size; ++j) {
+          edgMtx[i][j] = mtx[i][j];
+        }
+        edgMtx[i].fill(false, j, t_size);
+      } else {
+        edgMtx[i].fill(false);
+      }
+    }
+    maxNodes = t_size;
+    mtx = edgMtx;
+  }
 
+  // Public
   this.addNode = function () { // AddSingle Node to free index
     for (let i = 0; i < nodes.length; ++i) {
       if (nodes[i] === null) {
@@ -250,6 +253,12 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
       }
     }
   };
+  this.bounceNodes = function () {
+    return conf.bounceNodes;
+  };
+  this.bounceNodesAtWalls = function () {
+    return conf.bounceAtWalls;
+  };
   this.destroy = function () {
     this.stop();
     window.removeEventListener('resize', this.onResize);
@@ -259,6 +268,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
     ui = null;
     canvas.setAttribute('width', 0);
     canvas.setAttribute('height', 0);
+  };
+  this.electricalForce = function () {
+    return conf.electricalForce;
   };
   this.enableDiagnostics = function (t_bool) {
     if (t_bool === true || t_bool === false) {
@@ -301,6 +313,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   this.getNodes = function () {
     return nodes;
   };
+  this.getNodeBorderColor = function () {
+    return conf.nodeBorderColor;
+  };
   this.getNodeColor = function () {
     return conf.nodeColor;
   };
@@ -309,6 +324,9 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
       id: id,
       running: loopID !== null
     };
+  };
+  this.getWallBounceDecay = function () {
+    return conf.wallBounceDecay;
   };
   this.onResize = function (event) {
     setDimension(canvas);
@@ -355,13 +373,14 @@ atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   };
 
   // Run initialization Code
+  setMaxNodes(conf.maxNodes);
   setDimension(t_el);
   populate();
   var render = new atc.Render(t_el, this); // We are calling this here, so we need to make sure that this has all properties by now
   var physics = new atc.Physics(this);
   var ui = new atc.UserInterface(t_el, this);
   if (conf.uiEnabled) {
-    ui.bind(t_el);
+    ui.bindOn(t_el);
   }
   window.addEventListener('resize', this.onResize);
 };
@@ -395,7 +414,7 @@ atc.Render = atc.Render || function (t_el, t_instance) {
     ctx.arc(t_nd.pos.x, t_nd.pos.y, t_nd.size, 0, 2 * Math.PI);
     ctx.fill();
     ctx.lineWidth = 1.5;
-    ctx.strokeStyle = instance.getEdgeColor();
+    ctx.strokeStyle = instance.getNodeBorderColor();
     ctx.stroke();
   }
 
@@ -405,14 +424,12 @@ atc.Render = atc.Render || function (t_el, t_instance) {
     doRenderCycle: function () {
       drawBackground();
       var nds = instance.getNodes();
-      for (let i = 0; i < nds.length; ++i) {
+      for (let i = 0; i < nds.length - 1; ++i) {
         var nd = nds[i];
-        if (i < nds.length - 1) { // No need to calc edges for last node
-          var nbs = instance.getNeighbours(nd.id);
-          for (let j = 0; j < nbs.length; ++j) {
-            if (nbs[j].id > nd.id) { // Only draw Edges to nodes we have not walked yet
-              drawEdge(nd, nbs[j]);
-            }
+        var nbs = instance.getNeighbours(nd.id);
+        for (let j = 0; j < nbs.length; ++j) {
+          if (nbs[j].id > nd.id) { // Only draw Edges to nodes we have not walked yet
+            drawEdge(nd, nbs[j]);
           }
         }
       }
@@ -435,7 +452,8 @@ atc.Physics = atc.Physics || function (t_instance) {
   var instance = t_instance;
 
   function bounceNodesFromWalls () {
-    var decay = 1.0; // 0.9;
+    if (!instance.bounceNodesAtWalls()) return;
+    var decay = instance.getWallBounceDecay();
     var nds = instance.getNodes();
     var dim = instance.getDimensions();
     for (let i = 0; i < nds.length; ++i) {
@@ -482,9 +500,9 @@ atc.Physics = atc.Physics || function (t_instance) {
   }
 
   function applyCollsion (t_nd1, t_nd2) {
-    var radDist = t_nd1.size + t_nd2.size;
+    var dist = t_nd1.size + t_nd2.size;
     var cnt = 0;
-    while (radDist > t_nd1.distanceTo(t_nd2)) { // Move back to point of actual collision
+    while (dist > t_nd1.distanceTo(t_nd2)) { // Move back to point of actual collision
       t_nd1.pos.x += -t_nd1.vec.x * getSpeedFactor() * 0.1;
       t_nd1.pos.y += -t_nd1.vec.y * getSpeedFactor() * 0.1;
       t_nd2.pos.x += -t_nd2.vec.x * getSpeedFactor() * 0.1;
@@ -522,6 +540,7 @@ atc.Physics = atc.Physics || function (t_instance) {
   }
 
   function checkCollisions () {
+    if (!instance.bounceNodes()) return;
     var nds = instance.getNodes();
     var dim = instance.getDimensions();
     var quad = new QuadTree(0, new Rectangle(0, 0, dim.x, dim.y));
@@ -564,6 +583,7 @@ atc.Physics = atc.Physics || function (t_instance) {
   }
 
   function tickElectricalForce () {
+    if (!instance.electricalForce()) return;
     var step = 1000 / instance.getMaxFPS();
     var nds = instance.getNodes();
     for (let i = 0; i < nds.length - 1; ++i) {
@@ -686,7 +706,7 @@ atc.UserInterface = atc.UserInterface || function (t_el, t_instance) {
     mouseLastStamp = null;
   }
   return {
-    bind: function () {
+    bindOn: function () {
       el.addEventListener('mousedown', onMouseDown);
       el.addEventListener('mousemove', onMouseMove);
       window.addEventListener('mouseup', onMouseUp);
