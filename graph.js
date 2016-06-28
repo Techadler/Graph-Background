@@ -475,9 +475,8 @@ atc.Physics = atc.Physics || function (t_instance) {
     for (let idx = 0; idx < nds.length; ++idx) {
       var nd = nds[idx];
       if (nd.physics.locked !== true) {
-          nd.pos.x += nd.vec.x * speedFactor;
-          nd.pos.y += nd.vec.y * speedFactor;
-        }
+        nd.pos.x += nd.vec.x * speedFactor;
+        nd.pos.y += nd.vec.y * speedFactor;
       }
     }
   }
