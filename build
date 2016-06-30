@@ -1,0 +1,41 @@
+#!/bin/bash
+
+## Clean our directory
+buildFiles=(graph.min.js graph.min.js.map .jsver)
+for f in buildFiles
+do
+  if [ -a $f ]; then
+    rm $f
+  fi
+done
+
+## Read in Files
+function replaceBuild {
+  echo "${1/\[BUILD\]/$2}"
+}
+function replaceVersion {
+  echo "${1/\[VERSION\]/$2}"
+}
+## Read in Version and Build Number
+version=`cat .version`
+if [ -a ".build-counter" ]; then
+  build=`cat .build-counter` ## Read Last BuildNumber
+  build=`expr $build + 1`
+else
+  build=1
+fi
+## Write our BuildNumber back
+echo $build > '.build-counter'
+preamble=`cat PREAMBLE`
+preamble="${preamble}"
+preamble=$(replaceVersion "$preamble" "$version")
+preamble=$(replaceBuild "$preamble" "$build")
+
+## Get all Source files
+for f in src/*.js
+do
+  files="$files $f"
+done
+
+## Run UglifyJS2
+uglifyjs $files -o graph.min.js --source-map graph.min.js.map --preamble "$preamble" --mangle --compress --lint

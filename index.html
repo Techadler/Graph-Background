@@ -3,50 +3,31 @@
 <head>
   <meta charset="utf-8"></meta>
   <title>Under construction - techadler.de</title>
-  <script type="text/javascript" src="graph.js"></script>
-  <style>
-  body{
-    margin:0;
-    font-family:sans-serif;
-  }div{
-    position: absolute;
-    top:0px;
-    left:0px;
-    right:0px;
-    height:100vh;
-  }
-  h1{
-    position: fixed;
-    top:10vh;
-    left:10vh;
-    background-color: rgba(0,0,0,0.2);
-    padding:2vh;
-    z-index:100;
-    border-radius: 1vh;
-    color:whitesmoke;
-  }
-  </style>
+  <link rel="stylesheet" type="text/css" href="css/font-awesome.min.css" >
+  <link rel="stylesheet" type="text/css" href="css/base.css" >
+  <script type="text/javascript" src="graph.min.js"></script>
   <script type="text/javascript">
   window.addEventListener('load', function () {
     var settings = {
-      maxNodes: 200,
-      maxSpeed: 20,
-      maxEdgeLength: 150,
-      nodeMinSize: 3,
-      nodeMaxSize: 8,
       edgeWidth: 2,
+      uiEnabled: true,
+      width: 0,
+      height: 0,
+      electricalForce: false,
+      bounceAtWalls: true,
       nodeColor: '#ffffff',
-      backColor: '#0a89cc', // 'rgba(255,255,255,0.5)'
-      edgeColor: '#474747'
+      //backColor: 'rgba(255,255,255,0.0)',
+      edgeColor: '#474747',
+      nodeBorderColor: '#474747'
     };
-    var id = atc.base.createInstance(document.getElementById('canvas'), settings);
-    atc.base.startInstance(id);
+    var id = atc.manager.createInstance(document.getElementById('canvas'), settings);
+    atc.manager.startInstance(id);
   });
   </script>
 </head>
 <body>
   <noscript>This site works best with javascript enabled</noscript>
-  <div>
+  <div class="graph-container">
     <canvas id="canvas"></canvas>
   </div>
 </body>
