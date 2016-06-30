@@ -1,2 +1,3 @@
 ### Ignore minified version ###
+*.min.js.map
 *.min.js
