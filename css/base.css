@@ -1,0 +1,65 @@
+body{
+  margin:0;
+  font-family:sans-serif;
+}div.graph-container{
+  position: absolute;
+  top:0px;
+  bottom:0px;
+  left:0px;
+  right:0px;
+  overflow:hidden;
+}
+div.graph-container ul{
+  position: absolute;
+  display: flex;
+  top:0px;
+  right:0px;
+  padding:0;
+  padding-left: 40px;
+  width: 40px;
+  overflow: hidden;
+  background-color:rgba(0,0,0,0.1);
+  border-radius: 5px;
+  list-style-type: none;
+  transition: all 0.3s ease-in-out;
+  box-sizing: border-box;
+}
+div.graph-container ul:hover{
+  width: 280px; /* 40px times elements  */
+  padding-left:0px;
+}
+div.graph-container ul:hover li.button{
+}
+div.graph-container ul li.button {
+  display:inline-block;
+  color:white;
+  padding: 5px 0 5px 0;
+  margin:5px;
+  width:30px;
+  min-width: 30px; /* Dont let flex truncate us*/
+  text-align: center;
+  border-radius: 3px;
+  background-color:rgba(63, 63, 63, 0.70);
+  cursor: pointer;
+}
+div.graph-container ul li.disabled {
+  color: rgba(255,255,255,0.6);
+}
+div.graph-container ul li:first-of-type{ /* Make the settings cog stick to the right */
+  position: absolute;
+  right:0px;
+}
+div.graph-container i{
+  font-size:20px;
+}
+
+h1{
+  position: fixed;
+  top:10vh;
+  left:10vh;
+  background-color: rgba(0,0,0,0.2);
+  padding:2vh;
+  z-index:100;
+  border-radius: 1vh;
+  color:whitesmoke;
+}
