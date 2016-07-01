@@ -23,7 +23,7 @@ atc.Config = atc.Config || function () {
     maxWidth: 0,
 
     uiEnabled: true,
-    iagnosticsEnabled: true,
+    diagnosticsEnabled: true,
 
     maxEdges: 100,
     maxEdgeLength: 150,
