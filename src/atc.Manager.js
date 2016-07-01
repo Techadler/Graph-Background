@@ -18,38 +18,16 @@ atc.manager = atc.manager || (function () {
     return id;
   }
 
-  function parseConfig (t_conf) {
-    var defConf = atc.manager.getDefaultConfig();
-    if (t_conf !== undefined) {
-      var allKeys = Object.keys(defConf);
-      var keys = Object.keys(t_conf);
-      for (let idx in keys) { // Check config to only contain known setting options
-        if (allKeys.indexOf(keys[idx]) === -1) {
-          console.log('Unknown config option: ' + keys[idx]);
-          delete t_conf[keys[idx]];
-        }
-      }
-      for (let idx in allKeys) {
-        var key = allKeys[idx];
-        if (t_conf[key] === undefined) {
-          t_conf[key] = defConf[key];
-        }
-      }
-    } else {
-      t_conf = defConf;
-    }
-    return t_conf;
-  }
-
   // Public
   return {
     createInstance: function (t_el, t_conf) {
       if (t_el === undefined || t_el.nodeName !== 'CANVAS') {
         console.log('Passed element is not a canvas!'); return;
       }
-      t_conf = parseConfig(t_conf);
+      var conf = new atc.Config();
+      conf.parseConfig(t_conf);
       var id = generateID();
-      instances[id] = new atc.Instance(t_el, t_conf, id);
+      instances[id] = new atc.Instance(t_el, conf, id);
       return id;
     },
     getInstance: function (t_id) {

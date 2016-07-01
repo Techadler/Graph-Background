@@ -3,7 +3,7 @@ var atc = atc || {};
 atc.Instance = atc.Instance || function (t_el, t_conf, t_id) {
   if (!(this instanceof atc.Instance)) return new atc.Instance(t_el, t_conf, t_id);
 
-  var conf = t_conf;
+  var conf = t_conf.conf;
   var id = t_id;
   var canvas = t_el;
   var dimension = { x: undefined, y: undefined };
